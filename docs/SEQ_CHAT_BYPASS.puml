@@ -1,0 +1,17 @@
+@startuml
+actor User
+participant "Chat Client" as ChatClient
+participant "TokenMin Watcher" as TokenMin
+participant "SQLite Queue" as Queue
+participant "Remote LLM" as LLM
+
+User -> ChatClient: Enter prompt (model: copilot-chat)
+ChatClient -> Queue: INSERT message (status: pending)
+TokenMin -> Queue: Poll pending messages
+TokenMin -> TokenMin: Check BYPASS_MODELS config
+note right of TokenMin: "copilot-chat" is in BYPASS_MODELS
+TokenMin -> Queue: UPDATE message (status: Skipped, processed_content = raw_content)
+ChatClient -> Queue: Read processed_content
+ChatClient -> LLM: Send original prompt
+LLM -> ChatClient: Return response
+@enduml

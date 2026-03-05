@@ -1,0 +1,33 @@
+@startuml
+actor User
+participant "Chat Client" as Client
+participant "SQLite Queue" as Queue
+participant "TokenMin Watcher" as Watcher
+participant "Local SLM (Ollama)" as Ollama
+participant "Remote LLM" as Remote
+
+User -> Client: Enter prompt (model: gpt-4)
+Client -> Queue: INSERT message (status: pending)
+Watcher -> Queue: Poll pending messages
+Watcher -> Watcher: Check BYPASS_MODELS
+note right of Watcher: "gpt-4" NOT in bypass list
+
+group The Sanctuary (Preserve Code)
+    Watcher -> Watcher: Extract code blocks (Regex)
+    Watcher -> Watcher: Replace with <<CODE_BLOCK_N>>
+end
+
+group Context Distillation (Summarize)
+    Watcher -> Ollama: POST /api/generate (sanitized text)
+    Ollama -> Watcher: Return summary
+end
+
+group Reassembly
+    Watcher -> Watcher: Restore <<CODE_BLOCK_N>>
+    Watcher -> Queue: UPDATE message (status: completed, processed_content)
+end
+
+Client -> Queue: Read processed_content
+Client -> Remote: Send optimized prompt
+Remote -> Client: Return response
+@enduml

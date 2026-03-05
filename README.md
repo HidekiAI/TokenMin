@@ -16,6 +16,18 @@ TokenMin acts as a "trash compactor" for your LLM context. Instead of sending ra
 2.  **Context Distillation:** The non-code "text" segments are sent to a local SLM (e.g., Qwen 2.5 via Ollama). The model is tasked with generating a dense, information-heavy summary of the conversation history.
 3.  **Reassembly:** The original code is re-inserted into the compressed summary, resulting in a smaller payload that aims to retain the original technical logic while reducing token overhead.
 
+### Compaction Bypass
+- If the target model is known to be free (e.g., Copilot GPT-4.1), compaction is automatically bypassed.
+- No prompt injection or manual override is required; detection is automatic.
+- Future support for slash commands or plugin flags may be added for explicit bypass or formatting control.
+
+
+### Compaction Bypass
+- If the target model is known to be free (e.g., Copilot GPT-4.1), compaction is automatically bypassed.
+- No prompt injection or manual override is required; detection is automatic.
+- Future support for slash commands or plugin flags may be added for explicit bypass or formatting control.
+
+
 ## 📊 Performance Goals
 While efficiency varies based on the nature of the input, TokenMin aims to:
 
@@ -27,8 +39,19 @@ While efficiency varies based on the nature of the input, TokenMin aims to:
 TokenMin is currently a work-in-progress. It requires **Ollama** and a **Rust 2024** environment.
 
 ```bash
+# Set up all dependencies (Ollama, Rust, etc.)
+bash ./scripts/setup.sh [local|lxd|docker]
+
 # Set your SQLite path (optimized for shared memory)
 export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
 
+# Configure models to bypass compaction (comma-separated)
+export BYPASS_MODELS="copilot-chat,gpt-3.5-turbo,claude-instant-1"
+
 # Run the watcher
 cargo run --release
+```
+
+- `setup.sh` will call all required setup scripts (Ollama, Rust, etc.) to get the workspace ready for development and testing.
+- **MEMORY.md and INSTRUCTIONS.md must be updated together with README.md whenever approaches change, to keep documentation alive.**
+
