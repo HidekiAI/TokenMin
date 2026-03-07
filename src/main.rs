@@ -15,13 +15,16 @@ use tokio::time::sleep;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("TokenMin started.");
-
+    
     let config = Config::from_env();
     let db = Db::new(&config.db_path)?;
     let engine = Engine::new(config.bypass_models.clone());
-    let summarizer = Summarizer::new(config.ollama_url.clone(), config.ollama_model.clone());
+    
+    // Summarizer::new now returns a Result
+    let summarizer = Summarizer::new(config.ollama_url.clone(), config.ollama_model.clone())
+        .map_err(|e| format!("Failed to initialize summarizer: {}", e))?;
 
-    println!("Polling for messages in: {}", config.db_path);
+    println!("Polling for messages in: {} (Interval: {}ms)", config.db_path, config.poll_interval_ms);
 
     loop {
         match db.poll_pending_messages() {
@@ -32,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Err(e) => eprintln!("Database error: {}", e),
         }
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(config.poll_interval_ms)).await;
     }
 }
 
@@ -60,18 +63,14 @@ async fn process_message(db: &Db, engine: &Engine, summarizer: &Summarizer, msg:
     let sanctuary = extract_code_blocks(&msg.raw_content);
 
     // 3. Distillation (Summarize)
-    println!(
-        "Summarizing text ({} blocks preserved)...",
-        sanctuary.code_blocks.len()
-    );
+    println!("Summarizing text ({} blocks preserved)...", sanctuary.code_blocks.len());
     let summary_result = summarizer.summarize(&sanctuary.sanitized_text).await;
 
     match summary_result {
         Ok(summary) => {
             // 4. Reassembly
             let final_content = restore_code_blocks(&summary, &sanctuary.code_blocks);
-            if let Err(e) = db.update_message(id, ProcessingStatus::Completed, Some(final_content))
-            {
+            if let Err(e) = db.update_message(id, ProcessingStatus::Completed, Some(final_content)) {
                 eprintln!("Failed to mark message {} as completed: {}", id, e);
             } else {
                 println!("Message ID {} completed.", id);
@@ -80,13 +79,8 @@ async fn process_message(db: &Db, engine: &Engine, summarizer: &Summarizer, msg:
         Err(e) => {
             eprintln!("Summarization failed for ID {}: {}", id, e);
             // Fail-open: Skip compaction but don't block the message
-            if let Err(update_err) =
-                db.update_message(id, ProcessingStatus::Skipped, Some(msg.raw_content))
-            {
-                eprintln!(
-                    "Failed to mark message {} as skipped after error: {}",
-                    id, update_err
-                );
+            if let Err(update_err) = db.update_message(id, ProcessingStatus::Skipped, Some(msg.raw_content)) {
+                eprintln!("Failed to mark message {} as skipped after error: {}", id, update_err);
             }
         }
     }
