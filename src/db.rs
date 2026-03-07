@@ -180,7 +180,8 @@ mod tests {
         let pending = db.poll_pending_messages().unwrap();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].id, id);
-        assert_eq!(pending[0].status, ProcessingStatus::Pending);
+        // poll_pending_messages now atomically marks messages as Processing
+        assert_eq!(pending[0].status, ProcessingStatus::Processing);
 
         db.update_message(
             id,
