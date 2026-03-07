@@ -56,14 +56,20 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
         println!("Bypassing compaction for model: {:?}", msg.model);
         let processed = engine.process_bypass(msg);
         let db_clone = Arc::clone(&db);
-        let _ = tokio::task::spawn_blocking(move || {
+        if let Err(e) = tokio::task::spawn_blocking(move || {
             if let Err(e) =
                 db_clone.update_message(id, processed.status, processed.processed_content)
             {
                 eprintln!("Failed to update bypassed message {}: {}", id, e);
             }
         })
-        .await;
+        .await
+        {
+            eprintln!(
+                "Bypass update task for message {} panicked or was cancelled: {}",
+                id, e
+            );
+        }
         return;
     }
 
