@@ -41,10 +41,18 @@ impl FromStr for ProcessingStatus {
     }
 }
 
-// Idiomatic SQLite integration
+// Idiomatic and efficient SQLite integration
 impl ToSql for ProcessingStatus {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.to_string()))
+        // Return static strings to avoid heap allocation
+        let s = match self {
+            Self::Pending => "pending",
+            Self::Processing => "processing",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+            Self::Skipped => "skipped",
+        };
+        Ok(ToSqlOutput::from(s))
     }
 }
 
