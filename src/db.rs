@@ -1,5 +1,7 @@
 use crate::models::{Message, ProcessingStatus};
 use rusqlite::{Connection, Result, params};
+use std::fs;
+use std::path::Path;
 use std::sync::Mutex;
 
 pub struct Db {
@@ -8,6 +10,21 @@ pub struct Db {
 
 impl Db {
     pub fn new(path: &str) -> Result<Self> {
+        // Ensure parent directory exists
+        if let Some(parent) = Path::new(path)
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty() && !p.exists())
+        {
+            fs::create_dir_all(parent).map_err(|e| {
+                eprintln!("Failed to create database directory {:?}: {}", parent, e);
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?;
+        }
+
         let conn = Connection::open(path).map_err(|e| {
             eprintln!("Failed to open database at {}: {}", path, e);
             e
