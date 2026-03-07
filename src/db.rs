@@ -38,6 +38,7 @@ impl Db {
         Ok(())
     }
 
+    // TODO: Disallow dead_code once the client application is integrated and using these helpers.
     #[allow(dead_code)]
     pub fn insert_message(&self, message: &Message) -> Result<i64> {
         let now = std::time::SystemTime::now()
@@ -113,6 +114,7 @@ impl Db {
         Ok(())
     }
 
+    // TODO: Disallow dead_code once the client application is integrated and using these helpers.
     #[allow(dead_code)]
     pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
         let mut stmt = self.conn.prepare(
