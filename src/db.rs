@@ -1,5 +1,5 @@
 use crate::models::{Message, ProcessingStatus};
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 
 pub struct Db {
     conn: Connection,
@@ -85,7 +85,12 @@ impl Db {
         Ok(messages)
     }
 
-    pub fn update_message(&self, id: i64, status: ProcessingStatus, processed_content: Option<String>) -> Result<()> {
+    pub fn update_message(
+        &self,
+        id: i64,
+        status: ProcessingStatus,
+        processed_content: Option<String>,
+    ) -> Result<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -145,7 +150,12 @@ mod tests {
         assert_eq!(pending[0].id, id);
         assert_eq!(pending[0].status, ProcessingStatus::Pending);
 
-        db.update_message(id, ProcessingStatus::Completed, Some("Optimized content".into())).unwrap();
+        db.update_message(
+            id,
+            ProcessingStatus::Completed,
+            Some("Optimized content".into()),
+        )
+        .unwrap();
 
         let pending_after = db.poll_pending_messages().unwrap();
         assert_eq!(pending_after.len(), 0);
@@ -171,7 +181,12 @@ mod tests {
         let id = db.insert_message(&msg).unwrap();
 
         // Manually corrupt the status in the DB
-        db.conn.execute("UPDATE messages SET status = 'corrupt' WHERE id = ?1", params![id]).unwrap();
+        db.conn
+            .execute(
+                "UPDATE messages SET status = 'corrupt' WHERE id = ?1",
+                params![id],
+            )
+            .unwrap();
 
         let result = db.get_message_by_id(id);
         assert!(result.is_err());

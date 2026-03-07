@@ -1,5 +1,5 @@
-use regex::Regex;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 pub struct SanctuaryResult {
     pub sanitized_text: String,
@@ -15,13 +15,15 @@ pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
     let mut code_blocks = Vec::new();
     let mut counter = 0;
 
-    let sanitized_text = CODE_BLOCK_RE.replace_all(text, |caps: &regex::Captures| {
-        let full_block = caps.get(0).unwrap().as_str().to_string();
-        code_blocks.push(full_block);
-        let replacement = format!("<<CODE_BLOCK_{}>>", counter);
-        counter += 1;
-        replacement
-    }).to_string();
+    let sanitized_text = CODE_BLOCK_RE
+        .replace_all(text, |caps: &regex::Captures| {
+            let full_block = caps.get(0).unwrap().as_str().to_string();
+            code_blocks.push(full_block);
+            let replacement = format!("<<CODE_BLOCK_{}>>", counter);
+            counter += 1;
+            replacement
+        })
+        .to_string();
 
     SanctuaryResult {
         sanitized_text,
@@ -58,9 +60,10 @@ mod tests {
 
     #[test]
     fn test_sanctuary_extraction() {
-        let input = "Here is some code:\n```rust\nfn main() {}\n```\nAnd more:\n```python\nprint(1)\n```";
+        let input =
+            "Here is some code:\n```rust\nfn main() {}\n```\nAnd more:\n```python\nprint(1)\n```";
         let result = extract_code_blocks(input);
-        
+
         assert!(result.sanitized_text.contains("<<CODE_BLOCK_0>>"));
         assert!(result.sanitized_text.contains("<<CODE_BLOCK_1>>"));
         assert_eq!(result.code_blocks.len(), 2);
@@ -83,7 +86,7 @@ mod tests {
             "```rust\nfn main() {}\n```".to_string(),
             "```python\nprint(1)\n```".to_string(),
         ];
-        
+
         let final_text = restore_code_blocks(summary, &code_blocks);
         assert!(final_text.contains("fn main()"));
         assert!(final_text.contains("print(1)"));
@@ -93,7 +96,7 @@ mod tests {
     fn test_sanctuary_orphaned_blocks() {
         let summary = "The summary lost the placeholders.";
         let code_blocks = vec!["```rust\nfn main() {}\n```".to_string()];
-        
+
         let final_text = restore_code_blocks(summary, &code_blocks);
         assert!(final_text.contains("The summary lost the placeholders."));
         assert!(final_text.contains("```rust\nfn main() {}\n```"));

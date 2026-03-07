@@ -49,14 +49,13 @@ mod tests {
     #[test]
     fn test_config_loading() {
         let _guard = ENV_MUTEX.lock().unwrap();
-        
+
         // unsafe is required for env::set_var in Rust 2024 edition.
         // We use ENV_MUTEX to ensure thread safety during tests.
         unsafe {
             env::set_var("TOKENMIN_DB", "/tmp/test.db");
             env::set_var("BYPASS_MODELS", "model1, model2 ");
         }
-
 
         let config = Config::from_env();
         assert_eq!(config.db_path, "/tmp/test.db");
