@@ -15,6 +15,9 @@ impl Db {
         // Enable WAL mode for better concurrency
         conn.pragma_update(None, "journal_mode", "WAL")?;
 
+        // Configure a busy timeout so concurrent writes retry instead of immediately failing with SQLITE_BUSY
+        conn.busy_timeout(std::time::Duration::from_millis(5000))?;
+
         let db = Self { conn };
         db.init_schema()?;
         Ok(db)
