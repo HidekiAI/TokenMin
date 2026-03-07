@@ -99,8 +99,7 @@ impl Db {
     }
 
     /// Atomically claim all pending messages by transitioning them to `processing`
-    /// within a single timestamp so concurrent watcher instances cannot double-process
-    /// the same rows.
+    /// using `UPDATE ... RETURNING` to avoid race conditions and double-processing.
     pub fn poll_pending_messages(&self) -> Result<Vec<Message>> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -109,18 +108,12 @@ impl Db {
 
         let conn = self.lock_conn()?;
 
-        // Atomically claim all currently pending messages.
-        conn.execute(
-            "UPDATE messages SET status = 'processing', updated_at = ?1 WHERE status = 'pending'",
-            params![now],
-        )?;
-
-        // Return only the messages claimed in this call (identified by their updated_at timestamp).
+        // Atomically claim all currently pending messages and return them.
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, raw_content, processed_content, status, model
-             FROM messages
-             WHERE status = 'processing' AND updated_at = ?1
-             ORDER BY created_at ASC",
+            "UPDATE messages
+             SET status = 'processing', updated_at = ?1
+             WHERE status = 'pending'
+             RETURNING id, session_id, role, raw_content, processed_content, status, model",
         )?;
 
         let message_iter = stmt.query_map(params![now], |row| {
@@ -139,6 +132,10 @@ impl Db {
         for message in message_iter {
             messages.push(message?);
         }
+
+        // Ensure FIFO processing order (by ID)
+        messages.sort_by_key(|m| m.id);
+
         Ok(messages)
     }
 
