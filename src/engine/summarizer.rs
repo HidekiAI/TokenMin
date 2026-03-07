@@ -45,12 +45,8 @@ impl Summarizer {
         let client = Client::builder()
             .timeout(Duration::from_secs(60)) // Summarization can take time
             .build()?;
-            
-        Ok(Self {
-            client,
-            url,
-            model,
-        })
+
+        Ok(Self { client, url, model })
     }
 
     pub async fn summarize(&self, text: &str) -> Result<String, SummarizerError> {
@@ -68,7 +64,8 @@ impl Summarizer {
             stream: false,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/generate", self.url))
             .json(&request)
             .send()
@@ -79,10 +76,7 @@ impl Summarizer {
             return Err(SummarizerError::Api(response.status()));
         }
 
-        let body: OllamaResponse = response
-            .json()
-            .await
-            .map_err(SummarizerError::Parse)?;
+        let body: OllamaResponse = response.json().await.map_err(SummarizerError::Parse)?;
 
         Ok(body.response)
     }
@@ -97,12 +91,14 @@ mod tests {
     async fn test_summarizer_client() {
         let mut server = Server::new_async().await;
         let url = server.url();
-        
-        let _m = server.mock("POST", "/api/generate")
+
+        let _m = server
+            .mock("POST", "/api/generate")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"response": "This is a summary."}"#)
-            .create_async().await;
+            .create_async()
+            .await;
 
         let summarizer = Summarizer::new(url, "test-model".into()).unwrap();
         let result = summarizer.summarize("Original text").await;
