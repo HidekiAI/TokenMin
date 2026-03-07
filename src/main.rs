@@ -44,12 +44,17 @@ async fn process_message(db: &Db, engine: &Engine, summarizer: &Summarizer, msg:
     if engine.should_bypass(&msg) {
         println!("Bypassing compaction for model: {:?}", msg.model);
         let processed = engine.process_bypass(msg);
-        let _ = db.update_message(id, processed.status, processed.processed_content);
+        if let Err(e) = db.update_message(id, processed.status, processed.processed_content) {
+            eprintln!("Failed to update bypassed message {}: {}", id, e);
+        }
         return;
     }
 
     // Mark as processing
-    let _ = db.update_message(id, ProcessingStatus::Processing, None);
+    if let Err(e) = db.update_message(id, ProcessingStatus::Processing, None) {
+        eprintln!("Failed to mark message {} as processing: {}", id, e);
+        return; // Don't proceed if we can't update status
+    }
 
     // 2. Sanctuary (Extract Code)
     let sanctuary = extract_code_blocks(&msg.raw_content);
@@ -62,13 +67,18 @@ async fn process_message(db: &Db, engine: &Engine, summarizer: &Summarizer, msg:
         Ok(summary) => {
             // 4. Reassembly
             let final_content = restore_code_blocks(&summary, &sanctuary.code_blocks);
-            let _ = db.update_message(id, ProcessingStatus::Completed, Some(final_content));
-            println!("Message ID {} completed.", id);
+            if let Err(e) = db.update_message(id, ProcessingStatus::Completed, Some(final_content)) {
+                eprintln!("Failed to mark message {} as completed: {}", id, e);
+            } else {
+                println!("Message ID {} completed.", id);
+            }
         }
         Err(e) => {
             eprintln!("Summarization failed for ID {}: {}", id, e);
             // Fail-open: Skip compaction but don't block the message
-            let _ = db.update_message(id, ProcessingStatus::Skipped, Some(msg.raw_content));
+            if let Err(update_err) = db.update_message(id, ProcessingStatus::Skipped, Some(msg.raw_content)) {
+                eprintln!("Failed to mark message {} as skipped after error: {}", id, update_err);
+            }
         }
     }
 }

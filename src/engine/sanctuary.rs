@@ -1,17 +1,20 @@
 use regex::Regex;
+use once_cell::sync::Lazy;
 
 pub struct SanctuaryResult {
     pub sanitized_text: String,
     pub code_blocks: Vec<String>,
 }
 
+static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?s)```(\w+)?\n(.*?)\n?```").unwrap()
+});
+
 pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
-    // Regex for markdown code blocks: ```[lang]\n[code]```
-    let re = Regex::new(r"(?s)```(\w+)?\n(.*?)\n?```").unwrap();
     let mut code_blocks = Vec::new();
     let mut counter = 0;
 
-    let sanitized_text = re.replace_all(text, |caps: &regex::Captures| {
+    let sanitized_text = CODE_BLOCK_RE.replace_all(text, |caps: &regex::Captures| {
         let full_block = caps.get(0).unwrap().as_str().to_string();
         code_blocks.push(full_block);
         let replacement = format!("<<CODE_BLOCK_{}>>", counter);

@@ -7,7 +7,11 @@ pub struct Db {
 
 impl Db {
     pub fn new(path: &str) -> Result<Self> {
-        let conn = Connection::open(path)?;
+        let conn = Connection::open(path).map_err(|e| {
+            eprintln!("Failed to open database at {}: {}", path, e);
+            e
+        })?;
+        
         // Enable WAL mode for better concurrency
         conn.pragma_update(None, "journal_mode", "WAL")?;
         
@@ -47,7 +51,7 @@ impl Db {
                 message.session_id,
                 message.role,
                 message.raw_content,
-                serde_json::to_string(&message.status).unwrap().trim_matches('"'),
+                message.status.to_string(),
                 message.model,
                 now,
             ],
@@ -62,7 +66,15 @@ impl Db {
         
         let message_iter = stmt.query_map([], |row| {
             let status_str: String = row.get(5)?;
-            let status: ProcessingStatus = serde_json::from_str(&format!("\"{}\"", status_str)).unwrap();
+            // Use safe parsing instead of unwrap() to prevent crashes on invalid data
+            let status: ProcessingStatus = serde_json::from_str(&format!("\"{}\"", status_str))
+                .map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        5,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
             
             Ok(Message {
                 id: row.get(0)?,
@@ -88,13 +100,39 @@ impl Db {
             .unwrap()
             .as_millis() as i64;
             
-        let status_str = serde_json::to_string(&status).unwrap().trim_matches('"').to_string();
-
         self.conn.execute(
             "UPDATE messages SET status = ?1, processed_content = ?2, updated_at = ?3 WHERE id = ?4",
-            params![status_str, processed_content, now, id],
+            params![status.to_string(), processed_content, now, id],
         )?;
         Ok(())
+    }
+
+    pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE id = ?1"
+        )?;
+        
+        stmt.query_row(params![id], |row| {
+            let status_str: String = row.get(5)?;
+            let status: ProcessingStatus = serde_json::from_str(&format!("\"{}\"", status_str))
+                .map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        5,
+                        rusqlite::types::Type::Text,
+                        Box::new(e),
+                    )
+                })?;
+            
+            Ok(Message {
+                id: row.get(0)?,
+                session_id: row.get(1)?,
+                role: row.get(2)?,
+                raw_content: row.get(3)?,
+                processed_content: row.get(4)?,
+                status,
+                model: row.get(6)?,
+            })
+        })
     }
 }
 
@@ -132,12 +170,30 @@ mod tests {
         assert_eq!(pending_after.len(), 0);
         
         // Verify update
-        let mut stmt = db.conn.prepare("SELECT status, processed_content FROM messages WHERE id = ?1").unwrap();
-        let (status_str, processed): (String, Option<String>) = stmt.query_row(params![id], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        }).unwrap();
+        let msg_after = db.get_message_by_id(id).unwrap();
+        assert_eq!(msg_after.status, ProcessingStatus::Completed);
+        assert_eq!(msg_after.processed_content.unwrap(), "Optimized content");
+    }
+
+    #[test]
+    fn test_db_invalid_status_handling() {
+        let db = Db::new(":memory:").unwrap();
+        let msg = Message {
+            id: 0,
+            session_id: "session-1".into(),
+            role: "user".into(),
+            raw_content: "test".into(),
+            processed_content: None,
+            status: ProcessingStatus::Pending,
+            model: None,
+        };
+        let id = db.insert_message(&msg).unwrap();
         
-        assert_eq!(status_str, "completed");
-        assert_eq!(processed.unwrap(), "Optimized content");
+        // Manually corrupt the status in the DB
+        db.conn.execute("UPDATE messages SET status = 'corrupt' WHERE id = ?1", params![id]).unwrap();
+        
+        let result = db.get_message_by_id(id);
+        assert!(result.is_err());
     }
 }
+

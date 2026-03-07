@@ -33,8 +33,11 @@ impl Summarizer {
     }
 
     pub async fn summarize(&self, text: &str) -> Result<String, String> {
+        // Use clear delimiters to mitigate prompt injection
         let prompt = format!(
-            "Summarize the following text concisely, retaining all key technical constraints and request details. Do not output conversational filler. Text: {}",
+            "Summarize the following text concisely, retaining all key technical constraints and request details. \
+             Do not output conversational filler. \n\n\
+             [INPUT_START]\n{}\n[INPUT_END]",
             text
         );
 

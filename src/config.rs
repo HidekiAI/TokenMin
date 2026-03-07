@@ -40,9 +40,16 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+    use once_cell::sync::Lazy;
+
+    // Use a global mutex to serialize environment variable access in tests
+    static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
     #[test]
     fn test_config_loading() {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        
         unsafe {
             env::set_var("TOKENMIN_DB", "/tmp/test.db");
             env::set_var("BYPASS_MODELS", "model1, model2 ");
