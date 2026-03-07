@@ -1,0 +1,36 @@
+name: default
+
+on:
+  pull_request:
+    branches: [trunk]
+  push:
+    branches: [trunk]
+  merge_group:
+    branches: [trunk]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  default:
+    name: default
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo fmt (check)
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Cargo test
+        run: cargo test --all-features --all-targets
