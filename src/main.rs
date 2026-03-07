@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Summarizer::new now returns a Result
     let summarizer = Summarizer::new(config.ollama_url.clone(), config.ollama_model.clone())
-        .map_err(|e| format!("Failed to initialize summarizer: {}", e))?;
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to initialize summarizer: {}", e)))?;
 
     println!(
         "Polling for messages in: {} (Interval: {}ms)",
