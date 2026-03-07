@@ -47,7 +47,8 @@ impl Summarizer {
             stream: false,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/generate", self.url))
             .json(&request)
             .send()
@@ -76,12 +77,14 @@ mod tests {
     async fn test_summarizer_client() {
         let mut server = Server::new_async().await;
         let url = server.url();
-        
-        let _m = server.mock("POST", "/api/generate")
+
+        let _m = server
+            .mock("POST", "/api/generate")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"response": "This is a summary."}"#)
-            .create_async().await;
+            .create_async()
+            .await;
 
         let summarizer = Summarizer::new(url, "test-model".into());
         let result = summarizer.summarize("Original text").await;

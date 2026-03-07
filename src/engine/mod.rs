@@ -39,7 +39,7 @@ mod tests {
     #[test]
     fn test_bypass_logic() {
         let engine = Engine::new(vec!["copilot-chat".to_string(), "gpt-3.5".to_string()]);
-        
+
         let msg_to_bypass = Message {
             id: 1,
             session_id: "test".into(),
