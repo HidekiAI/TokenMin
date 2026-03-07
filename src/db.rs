@@ -103,6 +103,8 @@ impl Db {
         Ok(())
     }
 
+    // TODO: Disallow dead_code once the client application is integrated and using these helpers.
+    #[allow(dead_code)]
     pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
         let mut stmt = self.conn.prepare(
             "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE id = ?1"
