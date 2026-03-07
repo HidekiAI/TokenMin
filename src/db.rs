@@ -70,12 +70,31 @@ impl Db {
     }
 
     pub fn poll_pending_messages(&self) -> Result<Vec<Message>> {
+        // Use a single timestamp to correlate the messages claimed in this call.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE status = 'pending' ORDER BY created_at ASC"
+
+        // Atomically claim all currently pending messages by marking them as processing.
+        conn.execute(
+            "UPDATE messages
+             SET status = 'processing', updated_at = ?1
+             WHERE status = 'pending'",
+            params![now],
         )?;
 
-        let message_iter = stmt.query_map([], |row| {
+        // Return only the messages claimed in this call, identified by the shared updated_at.
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, role, raw_content, processed_content, status, model
+             FROM messages
+             WHERE status = 'processing' AND updated_at = ?1
+             ORDER BY created_at ASC",
+        )?;
+
+        let message_iter = stmt.query_map(params![now], |row| {
             Ok(Message {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
