@@ -79,8 +79,8 @@ impl Db {
     pub fn insert_message(&self, message: &Message) -> Result<i64> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
 
         let conn = self.lock_conn()?;
         conn.execute(
@@ -103,8 +103,8 @@ impl Db {
     pub fn poll_pending_messages(&self) -> Result<Vec<Message>> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
 
         let conn = self.lock_conn()?;
 
@@ -147,8 +147,8 @@ impl Db {
     ) -> Result<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
 
         let conn = self.lock_conn()?;
         conn.execute(
