@@ -7,8 +7,8 @@ pub struct SanctuaryResult {
 }
 
 static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
-    // Robust regex: allow optional whitespace after language tag
-    Regex::new(r"(?s)```(\w+)?\s*\n(.*?)\n?```").unwrap()
+    // Robust regex: allow optional whitespace after language tag and support Windows/Unix newlines
+    Regex::new(r"(?s)```([^\r\n`]*)?\s*\r?\n(.*?)\r?\n?```").unwrap()
 });
 
 pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
