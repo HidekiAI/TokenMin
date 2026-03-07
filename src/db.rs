@@ -1,8 +1,9 @@
 use crate::models::{Message, ProcessingStatus};
-use rusqlite::{Connection, Result, params};
+use rusqlite::{params, Connection, Result};
+use std::sync::Mutex;
 
 pub struct Db {
-    conn: Connection,
+    conn: Mutex<Connection>,
 }
 
 impl Db {
@@ -18,13 +19,14 @@ impl Db {
         // Configure a busy timeout so concurrent writes retry instead of immediately failing with SQLITE_BUSY
         conn.busy_timeout(std::time::Duration::from_millis(5000))?;
 
-        let db = Self { conn };
+        let db = Self { conn: Mutex::new(conn) };
         db.init_schema()?;
         Ok(db)
     }
 
     fn init_schema(&self) -> Result<()> {
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT NOT NULL,
@@ -49,23 +51,25 @@ impl Db {
             .unwrap()
             .as_millis() as i64;
 
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT INTO messages (session_id, role, raw_content, status, model, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 message.session_id,
                 message.role,
                 message.raw_content,
-                message.status, // Uses ToSql
+                message.status,
                 message.model,
                 now,
             ],
         )?;
-        Ok(self.conn.last_insert_rowid())
+        Ok(conn.last_insert_rowid())
     }
 
     pub fn poll_pending_messages(&self) -> Result<Vec<Message>> {
-        let mut stmt = self.conn.prepare(
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
             "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE status = 'pending' ORDER BY created_at ASC"
         )?;
 
@@ -76,7 +80,7 @@ impl Db {
                 role: row.get(2)?,
                 raw_content: row.get(3)?,
                 processed_content: row.get(4)?,
-                status: row.get(5)?, // Uses FromSql
+                status: row.get(5)?,
                 model: row.get(6)?,
             })
         })?;
@@ -88,20 +92,16 @@ impl Db {
         Ok(messages)
     }
 
-    pub fn update_message(
-        &self,
-        id: i64,
-        status: ProcessingStatus,
-        processed_content: Option<String>,
-    ) -> Result<()> {
+    pub fn update_message(&self, id: i64, status: ProcessingStatus, processed_content: Option<String>) -> Result<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_millis() as i64;
 
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "UPDATE messages SET status = ?1, processed_content = ?2, updated_at = ?3 WHERE id = ?4",
-            params![status, processed_content, now, id], // Uses ToSql
+            params![status, processed_content, now, id],
         )?;
         Ok(())
     }
@@ -109,7 +109,8 @@ impl Db {
     // TODO: Disallow dead_code once the client application is integrated and using these helpers.
     #[allow(dead_code)]
     pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
-        let mut stmt = self.conn.prepare(
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
             "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE id = ?1"
         )?;
 
@@ -120,7 +121,7 @@ impl Db {
                 role: row.get(2)?,
                 raw_content: row.get(3)?,
                 processed_content: row.get(4)?,
-                status: row.get(5)?, // Uses FromSql
+                status: row.get(5)?,
                 model: row.get(6)?,
             })
         })
@@ -155,12 +156,7 @@ mod tests {
         assert_eq!(pending[0].id, id);
         assert_eq!(pending[0].status, ProcessingStatus::Pending);
 
-        db.update_message(
-            id,
-            ProcessingStatus::Completed,
-            Some("Optimized content".into()),
-        )
-        .unwrap();
+        db.update_message(id, ProcessingStatus::Completed, Some("Optimized content".into())).unwrap();
 
         let pending_after = db.poll_pending_messages().unwrap();
         assert_eq!(pending_after.len(), 0);
@@ -186,12 +182,9 @@ mod tests {
         let id = db.insert_message(&msg).unwrap();
 
         // Manually corrupt the status in the DB
-        db.conn
-            .execute(
-                "UPDATE messages SET status = 'corrupt' WHERE id = ?1",
-                params![id],
-            )
-            .unwrap();
+        let conn = db.conn.lock().unwrap();
+        conn.execute("UPDATE messages SET status = 'corrupt' WHERE id = ?1", params![id]).unwrap();
+        drop(conn);
 
         let result = db.get_message_by_id(id);
         assert!(result.is_err());
