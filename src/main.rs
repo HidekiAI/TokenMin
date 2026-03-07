@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Summarizer::new now returns a Result
     let summarizer = Summarizer::new(config.ollama_url.clone(), config.ollama_model.clone())
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to initialize summarizer: {}", e)))?;
+        .map_err(|e| std::io::Error::other(format!("Failed to initialize summarizer: {}", e)))?;
 
     println!(
         "Polling for messages in: {} (Interval: {}ms)",
@@ -71,19 +71,6 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             );
         }
         return;
-    }
-
-    // Mark as processing
-    let db_clone = Arc::clone(&db);
-    let update_result = tokio::task::spawn_blocking(move || {
-        db_clone.update_message(id, ProcessingStatus::Processing, None)
-    })
-    .await
-    .unwrap();
-
-    if let Err(e) = update_result {
-        eprintln!("Failed to mark message {} as processing: {}", id, e);
-        return; // Don't proceed if we can't update status
     }
 
     // 2. Sanctuary (Extract Code)
