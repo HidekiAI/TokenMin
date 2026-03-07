@@ -58,11 +58,11 @@ impl Db {
             "INSERT INTO messages (session_id, role, raw_content, status, model, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
-                message.session_id,
-                message.role,
-                message.raw_content,
-                message.status,
-                message.model,
+                &message.session_id,
+                &message.role,
+                &message.raw_content,
+                &message.status,
+                &message.model,
                 now,
             ],
         )?;
