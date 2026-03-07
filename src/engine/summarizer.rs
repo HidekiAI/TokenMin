@@ -67,7 +67,7 @@ impl Summarizer {
             stream: false,
         };
 
-        let endpoint = format!("{}/api/generate", self.url.trim_end_matches('/'));
+        let endpoint = format!("{}/api/generate", self.url);
         let response = self
             .client
             .post(endpoint)
