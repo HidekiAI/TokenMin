@@ -1,5 +1,5 @@
 use crate::models::{Message, ProcessingStatus};
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 use std::sync::Mutex;
 
 pub struct Db {
@@ -19,7 +19,9 @@ impl Db {
         // Configure a busy timeout so concurrent writes retry instead of immediately failing with SQLITE_BUSY
         conn.busy_timeout(std::time::Duration::from_millis(5000))?;
 
-        let db = Self { conn: Mutex::new(conn) };
+        let db = Self {
+            conn: Mutex::new(conn),
+        };
         db.init_schema()?;
         Ok(db)
     }
@@ -92,7 +94,12 @@ impl Db {
         Ok(messages)
     }
 
-    pub fn update_message(&self, id: i64, status: ProcessingStatus, processed_content: Option<String>) -> Result<()> {
+    pub fn update_message(
+        &self,
+        id: i64,
+        status: ProcessingStatus,
+        processed_content: Option<String>,
+    ) -> Result<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -156,7 +163,12 @@ mod tests {
         assert_eq!(pending[0].id, id);
         assert_eq!(pending[0].status, ProcessingStatus::Pending);
 
-        db.update_message(id, ProcessingStatus::Completed, Some("Optimized content".into())).unwrap();
+        db.update_message(
+            id,
+            ProcessingStatus::Completed,
+            Some("Optimized content".into()),
+        )
+        .unwrap();
 
         let pending_after = db.poll_pending_messages().unwrap();
         assert_eq!(pending_after.len(), 0);
@@ -183,7 +195,11 @@ mod tests {
 
         // Manually corrupt the status in the DB
         let conn = db.conn.lock().unwrap();
-        conn.execute("UPDATE messages SET status = 'corrupt' WHERE id = ?1", params![id]).unwrap();
+        conn.execute(
+            "UPDATE messages SET status = 'corrupt' WHERE id = ?1",
+            params![id],
+        )
+        .unwrap();
         drop(conn);
 
         let result = db.get_message_by_id(id);

@@ -32,7 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let db_clone = Arc::clone(&db);
-        let poll_result = tokio::task::spawn_blocking(move || db_clone.poll_pending_messages()).await?;
+        let poll_result =
+            tokio::task::spawn_blocking(move || db_clone.poll_pending_messages()).await?;
 
         match poll_result {
             Ok(messages) => {
@@ -56,10 +57,13 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
         let processed = engine.process_bypass(msg);
         let db_clone = Arc::clone(&db);
         let _ = tokio::task::spawn_blocking(move || {
-            if let Err(e) = db_clone.update_message(id, processed.status, processed.processed_content) {
+            if let Err(e) =
+                db_clone.update_message(id, processed.status, processed.processed_content)
+            {
                 eprintln!("Failed to update bypassed message {}: {}", id, e);
             }
-        }).await;
+        })
+        .await;
         return;
     }
 
@@ -67,7 +71,9 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
     let db_clone = Arc::clone(&db);
     let update_result = tokio::task::spawn_blocking(move || {
         db_clone.update_message(id, ProcessingStatus::Processing, None)
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     if let Err(e) = update_result {
         eprintln!("Failed to mark message {} as processing: {}", id, e);
@@ -91,7 +97,9 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             let db_clone = Arc::clone(&db);
             let update_result = tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Completed, Some(final_content))
-            }).await.unwrap();
+            })
+            .await
+            .unwrap();
 
             if let Err(e) = update_result {
                 eprintln!("Failed to mark message {} as completed: {}", id, e);
@@ -106,7 +114,9 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             let db_clone = Arc::clone(&db);
             let update_result = tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Skipped, Some(raw_content))
-            }).await.unwrap();
+            })
+            .await
+            .unwrap();
 
             if let Err(update_err) = update_result {
                 eprintln!(
