@@ -7,8 +7,9 @@ pub struct SanctuaryResult {
 }
 
 static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
-    // Robust regex: allow optional whitespace after language tag
-    Regex::new(r"(?s)```(\w+)?\s*\n(.*?)\n?```").unwrap()
+    // Robust regex: support language tags with non-word chars (c++, tsx, objective-c),
+    // optional whitespace after the tag, and both Unix (\n) and Windows (\r\n) newlines.
+    Regex::new(r"(?s)```([^\r\n`]*)?\s*\r?\n(.*?)\r?\n?```").unwrap()
 });
 
 pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
@@ -32,26 +33,49 @@ pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
 }
 
 pub fn restore_code_blocks(summary: &str, code_blocks: &[String]) -> String {
-    let mut final_text = summary.to_string();
-    let mut used_indices = std::collections::HashSet::new();
+    // Single-pass replacement: scan the text once and replace placeholders
+    // as they are encountered, avoiding O(n*m) reallocations.
+    let mut result = String::with_capacity(summary.len());
+    let mut remaining = summary;
+    let mut used_indices = vec![false; code_blocks.len()];
 
-    for (i, block) in code_blocks.iter().enumerate() {
-        let placeholder = format!("<<CODE_BLOCK_{}>>", i);
-        if final_text.contains(&placeholder) {
-            final_text = final_text.replace(&placeholder, block);
-            used_indices.insert(i);
+    while !remaining.is_empty() {
+        // Find the earliest placeholder in the remaining text
+        let mut earliest: Option<(usize, usize, usize)> = None; // (pos, end, index)
+        for (i, _) in code_blocks.iter().enumerate() {
+            let placeholder = format!("<<CODE_BLOCK_{}>>", i);
+            if let Some(pos) = remaining.find(&placeholder) {
+                let end = pos + placeholder.len();
+                if earliest.is_none_or(|(e, _, _)| pos < e) {
+                    earliest = Some((pos, end, i));
+                }
+            }
+        }
+
+        match earliest {
+            Some((pos, end, i)) => {
+                result.push_str(&remaining[..pos]);
+                result.push_str(&code_blocks[i]);
+                used_indices[i] = true;
+                remaining = &remaining[end..];
+            }
+            None => {
+                // No more placeholders; append the rest of the text
+                result.push_str(remaining);
+                break;
+            }
         }
     }
 
     // Safety fallback: append orphaned blocks if they were lost in summarization
     for (i, block) in code_blocks.iter().enumerate() {
-        if !used_indices.contains(&i) {
-            final_text.push_str("\n\n");
-            final_text.push_str(block);
+        if !used_indices[i] {
+            result.push_str("\n\n");
+            result.push_str(block);
         }
     }
 
-    final_text
+    result
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use crate::models::{Message, ProcessingStatus};
 use rusqlite::{Connection, Result, params};
+use std::path::Path;
 use std::sync::Mutex;
 
 pub struct Db {
@@ -8,6 +9,23 @@ pub struct Db {
 
 impl Db {
     pub fn new(path: &str) -> Result<Self> {
+        // Create the parent directory if it doesn't exist (e.g., /dev/shm/tokenmin/)
+        if path != ":memory:"
+            && let Some(parent) = Path::new(path).parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CANTOPEN),
+                    Some(format!(
+                        "Failed to create parent directory '{}': {}",
+                        parent.display(),
+                        e
+                    )),
+                )
+            })?;
+        }
+
         let conn = Connection::open(path).map_err(|e| {
             eprintln!("Failed to open database at {}: {}", path, e);
             e
@@ -26,8 +44,19 @@ impl Db {
         Ok(db)
     }
 
+    /// Acquire the connection lock, converting a poisoned Mutex into a rusqlite error
+    /// instead of panicking, so a single task failure won't bring down the daemon.
+    fn lock_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
+        self.conn.lock().map_err(|e| {
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISUSE),
+                Some(format!("Mutex poisoned: {}", e)),
+            )
+        })
+    }
+
     fn init_schema(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +82,7 @@ impl Db {
             .unwrap()
             .as_millis() as i64;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "INSERT INTO messages (session_id, role, raw_content, status, model, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -69,13 +98,32 @@ impl Db {
         Ok(conn.last_insert_rowid())
     }
 
+    /// Atomically claim all pending messages by transitioning them to `processing`
+    /// within a single timestamp so concurrent watcher instances cannot double-process
+    /// the same rows.
     pub fn poll_pending_messages(&self) -> Result<Vec<Message>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE status = 'pending' ORDER BY created_at ASC"
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+
+        let conn = self.lock_conn()?;
+
+        // Atomically claim all currently pending messages.
+        conn.execute(
+            "UPDATE messages SET status = 'processing', updated_at = ?1 WHERE status = 'pending'",
+            params![now],
         )?;
 
-        let message_iter = stmt.query_map([], |row| {
+        // Return only the messages claimed in this call (identified by their updated_at timestamp).
+        let mut stmt = conn.prepare(
+            "SELECT id, session_id, role, raw_content, processed_content, status, model
+             FROM messages
+             WHERE status = 'processing' AND updated_at = ?1
+             ORDER BY created_at ASC",
+        )?;
+
+        let message_iter = stmt.query_map(params![now], |row| {
             Ok(Message {
                 id: row.get(0)?,
                 session_id: row.get(1)?,
@@ -105,7 +153,7 @@ impl Db {
             .unwrap()
             .as_millis() as i64;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "UPDATE messages SET status = ?1, processed_content = ?2, updated_at = ?3 WHERE id = ?4",
             params![status, processed_content, now, id],
@@ -116,7 +164,7 @@ impl Db {
     // TODO: Disallow dead_code once the client application is integrated and using these helpers.
     #[allow(dead_code)]
     pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE id = ?1"
         )?;
@@ -158,10 +206,11 @@ mod tests {
         let id = db.insert_message(&msg).unwrap();
         assert!(id > 0);
 
-        let pending = db.poll_pending_messages().unwrap();
-        assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, id);
-        assert_eq!(pending[0].status, ProcessingStatus::Pending);
+        // poll_pending_messages atomically claims messages as 'processing'
+        let claimed = db.poll_pending_messages().unwrap();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].id, id);
+        assert_eq!(claimed[0].status, ProcessingStatus::Processing);
 
         db.update_message(
             id,

@@ -27,6 +27,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     libsqlite3-0 \
     curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -35,7 +36,11 @@ COPY --from=builder /usr/src/tokenmin/scripts /app/scripts
 
 # Default environment variables
 ENV TOKENMIN_DB=/tmp/tokenmin.db
-ENV OLLAMA_URL=http://host.docker.internal:11434
+# NOTE: OLLAMA_URL is intentionally not set by default.
+# Set OLLAMA_URL at runtime (e.g. via -e OLLAMA_URL=http://...).
+# On Linux, to reach a host-side Ollama, run the container with:
+#   --add-host=host.docker.internal:host-gateway
+# and then set: -e OLLAMA_URL=http://host.docker.internal:11434
 
 # The container will run the watcher
 CMD ["./tokenmin"]

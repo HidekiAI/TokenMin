@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Summarizer::new now returns a Result
     let summarizer = Summarizer::new(config.ollama_url.clone(), config.ollama_model.clone())
-        .map_err(|e| format!("Failed to initialize summarizer: {}", e))?;
+        .map_err(|e| std::io::Error::other(format!("Failed to initialize summarizer: {}", e)))?;
 
     println!(
         "Polling for messages in: {} (Interval: {}ms)",
@@ -56,24 +56,31 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
         println!("Bypassing compaction for model: {:?}", msg.model);
         let processed = engine.process_bypass(msg);
         let db_clone = Arc::clone(&db);
-        let _ = tokio::task::spawn_blocking(move || {
-            if let Err(e) =
-                db_clone.update_message(id, processed.status, processed.processed_content)
-            {
-                eprintln!("Failed to update bypassed message {}: {}", id, e);
-            }
+        match tokio::task::spawn_blocking(move || {
+            db_clone.update_message(id, processed.status, processed.processed_content)
         })
-        .await;
+        .await
+        {
+            Ok(Err(e)) => eprintln!("Failed to update bypassed message {}: {}", id, e),
+            Err(e) => eprintln!("Task panicked updating bypassed message {}: {}", id, e),
+            Ok(Ok(())) => {}
+        }
         return;
     }
 
     // Mark as processing
     let db_clone = Arc::clone(&db);
-    let update_result = tokio::task::spawn_blocking(move || {
+    let update_result = match tokio::task::spawn_blocking(move || {
         db_clone.update_message(id, ProcessingStatus::Processing, None)
     })
     .await
-    .unwrap();
+    {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("Task panicked marking message {} as processing: {}", id, e);
+            return;
+        }
+    };
 
     if let Err(e) = update_result {
         eprintln!("Failed to mark message {} as processing: {}", id, e);
@@ -95,16 +102,14 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             // 4. Reassembly
             let final_content = restore_code_blocks(&summary, &sanctuary.code_blocks);
             let db_clone = Arc::clone(&db);
-            let update_result = tokio::task::spawn_blocking(move || {
+            match tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Completed, Some(final_content))
             })
             .await
-            .unwrap();
-
-            if let Err(e) = update_result {
-                eprintln!("Failed to mark message {} as completed: {}", id, e);
-            } else {
-                println!("Message ID {} completed.", id);
+            {
+                Ok(Ok(())) => println!("Message ID {} completed.", id),
+                Ok(Err(e)) => eprintln!("Failed to mark message {} as completed: {}", id, e),
+                Err(e) => eprintln!("Task panicked marking message {} as completed: {}", id, e),
             }
         }
         Err(e) => {
@@ -112,17 +117,20 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             // Fail-open: Skip compaction but don't block the message
             let raw_content = msg.raw_content.clone();
             let db_clone = Arc::clone(&db);
-            let update_result = tokio::task::spawn_blocking(move || {
+            match tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Skipped, Some(raw_content))
             })
             .await
-            .unwrap();
-
-            if let Err(update_err) = update_result {
-                eprintln!(
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!(
                     "Failed to mark message {} as skipped after error: {}",
-                    id, update_err
-                );
+                    id, e
+                ),
+                Err(e) => eprintln!(
+                    "Task panicked marking message {} as skipped after error: {}",
+                    id, e
+                ),
             }
         }
     }
