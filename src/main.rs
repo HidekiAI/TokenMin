@@ -55,9 +55,11 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
     if engine.should_bypass(&msg) {
         println!("Bypassing compaction for model: {:?}", msg.model);
         let processed = engine.process_bypass(msg);
+        let status = processed.status;
+        let processed_content = processed.processed_content;
         let db_clone = Arc::clone(&db);
         match tokio::task::spawn_blocking(move || {
-            db_clone.update_message(id, processed.status, processed.processed_content)
+            db_clone.update_message(id, status, processed_content)
         })
         .await
         {
@@ -68,24 +70,7 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
         return;
     }
 
-    // Mark as processing
-    let db_clone = Arc::clone(&db);
-    let update_result = match tokio::task::spawn_blocking(move || {
-        db_clone.update_message(id, ProcessingStatus::Processing, None)
-    })
-    .await
-    {
-        Ok(result) => result,
-        Err(e) => {
-            eprintln!("Task panicked marking message {} as processing: {}", id, e);
-            return;
-        }
-    };
-
-    if let Err(e) = update_result {
-        eprintln!("Failed to mark message {} as processing: {}", id, e);
-        return; // Don't proceed if we can't update status
-    }
+    // Note: Message is already marked as 'processing' by poll_pending_messages in db.rs
 
     // 2. Sanctuary (Extract Code)
     let sanctuary = extract_code_blocks(&msg.raw_content);
