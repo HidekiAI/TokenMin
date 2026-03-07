@@ -10,7 +10,7 @@ ChatClient -> Queue: INSERT message (status: pending)
 TokenMin -> Queue: Poll pending messages
 TokenMin -> TokenMin: Check BYPASS_MODELS config
 note right of TokenMin: "copilot-chat" is in BYPASS_MODELS
-TokenMin -> Queue: UPDATE message (status: Skipped, processed_content = raw_content)
+TokenMin -> Queue: UPDATE message (status: skipped, processed_content = raw_content)
 ChatClient -> Queue: Read processed_content
 ChatClient -> LLM: Send original prompt
 LLM -> ChatClient: Return response

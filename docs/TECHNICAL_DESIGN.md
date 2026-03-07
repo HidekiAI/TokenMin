@@ -85,7 +85,7 @@ pub enum ProcessingStatus {
 
 ---
 
-## 4. detailed Algorithms
+## 4. Detailed Algorithms
 
 ### 4.1. Model Classification & Bypass (The "Free Tier" Check)
 
