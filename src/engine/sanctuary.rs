@@ -32,42 +32,34 @@ pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
     }
 }
 
+static PLACEHOLDER_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"<<CODE_BLOCK_(\d+)>>").unwrap()
+});
+
 pub fn restore_code_blocks(summary: &str, code_blocks: &[String]) -> String {
-    // Single-pass replacement: scan the text once and replace placeholders
-    // as they are encountered, avoiding O(n*m) reallocations.
-    let mut result = String::with_capacity(summary.len());
-    let mut remaining = summary;
     let mut used_indices = vec![false; code_blocks.len()];
 
-    while !remaining.is_empty() {
-        // Find the earliest placeholder in the remaining text
-        let mut earliest: Option<(usize, usize, usize)> = None; // (pos, end, index)
-        for (i, _) in code_blocks.iter().enumerate() {
-            let placeholder = format!("<<CODE_BLOCK_{}>>", i);
-            if let Some(pos) = remaining.find(&placeholder) {
-                let end = pos + placeholder.len();
-                if earliest.is_none_or(|(e, _, _)| pos < e) {
-                    earliest = Some((pos, end, i));
-                }
-            }
-        }
+    // Single-pass replacement using a regex to find all placeholders.
+    let mut result = PLACEHOLDER_RE
+        .replace_all(summary, |caps: &regex::Captures| {
+            let index: usize = caps
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()
+                .unwrap_or(usize::MAX);
 
-        match earliest {
-            Some((pos, end, i)) => {
-                result.push_str(&remaining[..pos]);
-                result.push_str(&code_blocks[i]);
-                used_indices[i] = true;
-                remaining = &remaining[end..];
+            if index < code_blocks.len() {
+                used_indices[index] = true;
+                code_blocks[index].clone()
+            } else {
+                // If index is invalid, leave it as is.
+                caps.get(0).unwrap().as_str().to_string()
             }
-            None => {
-                // No more placeholders; append the rest of the text
-                result.push_str(remaining);
-                break;
-            }
-        }
-    }
+        })
+        .to_string();
 
-    // Safety fallback: append orphaned blocks if they were lost in summarization
+    // Safety fallback: append orphaned blocks if they were lost in summarization.
     for (i, block) in code_blocks.iter().enumerate() {
         if !used_indices[i] {
             result.push_str("\n\n");
