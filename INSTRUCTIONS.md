@@ -11,8 +11,10 @@
     ```bash
     export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
     ```
-- **Testing:**
-  - No explicit test or lint commands found in the repository structure. If tests are added, use standard Rust conventions (`cargo test` for all tests, `cargo test <testname>` for a single test).
+- **Testing and Linting:**
+  - Format code with `cargo fmt`.
+  - Run lints with `cargo clippy -D warnings`.
+  - Run the test suite with `cargo test` (or `cargo test <testname>` for a single test).
 
 ## High-Level Architecture
 - **Purpose:** TokenMin is a Rust-based prompt pre-processor that reduces LLM API token usage by filtering and compressing chat context before sending it to remote providers.

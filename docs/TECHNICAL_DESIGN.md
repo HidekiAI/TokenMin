@@ -178,7 +178,7 @@ We will build the system strictly following TDD.
 
 ## 6. Error Handling Strategy
 
-1.  **Database Locking:** Use `wal` mode (Write-Ahead Logging) in SQLite for better concurrency. Handle `SQLITE_BUSY` with a short retry loop.
+1.  **Database Locking:** Use `wal` mode (Write-Ahead Logging) in SQLite for better concurrency. The database layer sets a `busy_timeout` of 5 seconds so that concurrent writes retry automatically instead of immediately failing with `SQLITE_BUSY`.
 2.  **Ollama Failure:** If the local LLM is down or times out:
     *   Log the error.
     *   Mark status as `Skipped` (Fail-Open).
