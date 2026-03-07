@@ -20,7 +20,7 @@ impl Config {
             env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
 
         let ollama_model =
-            env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
+            env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen2.5-coder:0.5b".to_string());
 
         let bypass_models = env::var("BYPASS_MODELS")
             .unwrap_or_else(|_| "".to_string())
