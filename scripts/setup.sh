@@ -46,6 +46,11 @@ echo "[setup.sh] Setup mode selected: $MODE (OS: $OS_TYPE)"
 
 case "$MODE" in
   local)
+    if [[ "$OS_TYPE" != "Linux" ]]; then
+      echo "[setup.sh] ERROR: 'local' setup mode is only supported on Linux. Detected OS: $OS_TYPE"
+      echo "[setup.sh] Please use 'docker' mode (or another supported mode) on this platform."
+      exit 1
+    fi
     bash "$SCRIPT_DIR/setup_rust.sh"
     bash "$SCRIPT_DIR/setup_ollama.sh"
     ;;

@@ -16,8 +16,6 @@ TokenMin is a Rust-based prompt pre-processor that reduces LLM API consumption b
 - **Reassembly:** The original code is reinserted into the compressed summary, maintaining technical accuracy while reducing token count.
 - **Compaction Bypass:** If the target model is free (e.g., Copilot GPT-4.1), compaction is automatically bypassed. No manual override or prompt injection is required.
 
-- **Compaction Bypass:** If the target model is free (e.g., Copilot GPT-4.1), compaction is automatically bypassed. No manual override or prompt injection is required.
-
 ## Performance Goals
 - Minimize token waste and financial cost.
 - Achieve low latency using Rust concurrency and shared memory.

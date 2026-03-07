@@ -4,6 +4,19 @@ set -euo pipefail
 
 MODEL_NAME="${OLLAMA_MODEL:-qwen2.5-coder:0.5b}"
 
+OS_TYPE="$(uname -s 2>/dev/null || echo unknown)"
+case "$OS_TYPE" in
+  Linux*)
+    echo "[setup_ollama.sh] Detected Linux ($OS_TYPE). Proceeding with Ollama installation."
+    ;;
+  *)
+    echo "[setup_ollama.sh] Unsupported operating system: $OS_TYPE"
+    echo "[setup_ollama.sh] This setup script currently supports only Linux using the official ollama.com installer."
+    echo "[setup_ollama.sh] Please install Ollama manually for your platform and configure it before rerunning this setup."
+    exit 1
+    ;;
+esac
+
 install_ollama() {
   if command -v ollama >/dev/null 2>&1; then
     echo "[setup_ollama.sh] Ollama is already installed. Checking for updates..."
@@ -16,8 +29,6 @@ install_ollama() {
   fi
 }
 
-# The official installer handles everything on Linux.
-# For other OSs or custom paths, user should install manually or we can expand this.
 install_ollama
 
 echo "[setup_ollama.sh] Ensuring Ollama is running..."
@@ -34,3 +45,4 @@ echo "[setup_ollama.sh] Pulling minimal model: $MODEL_NAME ..."
 ollama pull "$MODEL_NAME"
 
 echo "[setup_ollama.sh] Ollama setup complete with model $MODEL_NAME."
+

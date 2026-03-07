@@ -17,14 +17,8 @@ TokenMin acts as a "trash compactor" for your LLM context. Instead of sending ra
 3.  **Reassembly:** The original code is re-inserted into the compressed summary, resulting in a smaller payload that aims to retain the original technical logic while reducing token overhead.
 
 ### Compaction Bypass
-- If the target model is known to be free (e.g., Copilot GPT-4.1), compaction is automatically bypassed.
-- No prompt injection or manual override is required; detection is automatic.
-- Future support for slash commands or plugin flags may be added for explicit bypass or formatting control.
-
-
-### Compaction Bypass
-- If the target model is known to be free (e.g., Copilot GPT-4.1), compaction is automatically bypassed.
-- No prompt injection or manual override is required; detection is automatic.
+- If the target model matches an entry in the `BYPASS_MODELS` env var (e.g., Copilot GPT-4.1), compaction is bypassed.
+- No prompt injection or manual override is required at the prompt level; behavior is controlled through `BYPASS_MODELS` configuration.
 - Future support for slash commands or plugin flags may be added for explicit bypass or formatting control.
 
 
