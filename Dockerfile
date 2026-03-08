@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /usr/src/tokenmin/target/release/TokenMin /app/tokenmin
+COPY --from=builder /usr/src/tokenmin/target/release/token-min /app/token-min
 
 # Default environment variables
 ENV TOKENMIN_DB=/tmp/tokenmin.db
@@ -39,4 +39,4 @@ ENV TOKENMIN_DB=/tmp/tokenmin.db
 # and then set: -e OLLAMA_URL=http://host.docker.internal:11434
 
 # The container will run the watcher
-CMD ["./tokenmin"]
+CMD ["./token-min"]
