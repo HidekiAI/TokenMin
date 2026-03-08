@@ -5,12 +5,14 @@ on:
     - cron: '0 * * * *' # Runs every hour
   pull_request:
     branches:
+      - 'trunk'
       - 'main'
       - 'release/**/*'
     paths:
       - '.github/workflows/gemini-scheduled-triage.yml'
   push:
     branches:
+      - 'trunk'
       - 'main'
       - 'release/**/*'
     paths:
