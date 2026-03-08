@@ -32,16 +32,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let db_clone = Arc::clone(&db);
-        let poll_result =
-            tokio::task::spawn_blocking(move || db_clone.poll_pending_messages()).await?;
+        let poll_handle =
+            tokio::task::spawn_blocking(move || db_clone.poll_pending_messages()).await;
 
-        match poll_result {
-            Ok(messages) => {
+        match poll_handle {
+            Ok(Ok(messages)) => {
                 for msg in messages {
                     process_message(Arc::clone(&db), &engine, &summarizer, msg).await;
                 }
             }
-            Err(e) => eprintln!("Database error: {}", e),
+            Ok(Err(e)) => eprintln!("Database poll error: {}", e),
+            Err(e) => eprintln!("Database task failed (panic or cancelled): {}", e),
         }
         sleep(Duration::from_millis(config.poll_interval_ms)).await;
     }
