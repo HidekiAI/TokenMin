@@ -82,11 +82,11 @@ jobs:
           )"
 
           echo '📝 Setting output for GitHub Actions...'
-          cat <<'EOF' >> "${GITHUB_OUTPUT}"
-          issues_to_triage<<EOM
-          ${ISSUES}
-          EOM
-          EOF
+          {
+            echo 'issues_to_triage<<EOF'
+            echo "${ISSUES}"
+            echo 'EOF'
+          } >> "${GITHUB_OUTPUT}"
 
           ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
           echo "✅ Found ${ISSUE_COUNT} issue(s) to triage! 🎯"
