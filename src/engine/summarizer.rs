@@ -46,6 +46,9 @@ impl Summarizer {
             .timeout(Duration::from_secs(60)) // Summarization can take time
             .build()?;
 
+        // Normalize URL: trim trailing slash to avoid double-slash in endpoint construction
+        let url = url.trim_end_matches('/').to_string();
+
         Ok(Self { client, url, model })
     }
 
@@ -64,7 +67,7 @@ impl Summarizer {
             stream: false,
         };
 
-        let endpoint = format!("{}/api/generate", self.url.trim_end_matches('/'));
+        let endpoint = format!("{}/api/generate", self.url);
         let response = self
             .client
             .post(endpoint)

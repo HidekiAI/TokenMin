@@ -58,20 +58,19 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
         let status = processed.status;
         let processed_content = processed.processed_content;
         let db_clone = Arc::clone(&db);
-        if let Err(e) = tokio::task::spawn_blocking(move || {
-            if let Err(e) = db_clone.update_message(id, status, processed_content) {
-                eprintln!("Failed to update bypassed message {}: {}", id, e);
-            }
+        match tokio::task::spawn_blocking(move || {
+            db_clone.update_message(id, status, processed_content)
         })
         .await
         {
-            eprintln!(
-                "Bypass update task for message {} panicked or was cancelled: {}",
-                id, e
-            );
+            Ok(Err(e)) => eprintln!("Failed to update bypassed message {}: {}", id, e),
+            Err(e) => eprintln!("Task panicked updating bypassed message {}: {}", id, e),
+            Ok(Ok(())) => {}
         }
         return;
     }
+
+    // Note: Message is already marked as 'processing' by poll_pending_messages in db.rs
 
     // 2. Sanctuary (Extract Code)
     let sanctuary = extract_code_blocks(&msg.raw_content);
@@ -88,16 +87,14 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             // 4. Reassembly
             let final_content = restore_code_blocks(&summary, &sanctuary.code_blocks);
             let db_clone = Arc::clone(&db);
-            let update_result = tokio::task::spawn_blocking(move || {
+            match tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Completed, Some(final_content))
             })
             .await
-            .unwrap();
-
-            if let Err(e) = update_result {
-                eprintln!("Failed to mark message {} as completed: {}", id, e);
-            } else {
-                println!("Message ID {} completed.", id);
+            {
+                Ok(Ok(())) => println!("Message ID {} completed.", id),
+                Ok(Err(e)) => eprintln!("Failed to mark message {} as completed: {}", id, e),
+                Err(e) => eprintln!("Task panicked marking message {} as completed: {}", id, e),
             }
         }
         Err(e) => {
@@ -105,17 +102,20 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
             // Fail-open: Skip compaction but don't block the message
             let raw_content = msg.raw_content.clone();
             let db_clone = Arc::clone(&db);
-            let update_result = tokio::task::spawn_blocking(move || {
+            match tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Skipped, Some(raw_content))
             })
             .await
-            .unwrap();
-
-            if let Err(update_err) = update_result {
-                eprintln!(
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => eprintln!(
                     "Failed to mark message {} as skipped after error: {}",
-                    id, update_err
-                );
+                    id, e
+                ),
+                Err(e) => eprintln!(
+                    "Task panicked marking message {} as skipped after error: {}",
+                    id, e
+                ),
             }
         }
     }

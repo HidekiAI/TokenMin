@@ -7,7 +7,8 @@ pub struct SanctuaryResult {
 }
 
 static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
-    // Robust regex: allow optional whitespace after language tag and support Windows/Unix newlines
+    // Robust regex: support language tags with non-word chars (c++, tsx, objective-c),
+    // optional whitespace after the tag, and both Unix (\n) and Windows (\r\n) newlines.
     Regex::new(r"(?s)```([^\r\n`]*)?\s*\r?\n(.*?)\r?\n?```").unwrap()
 });
 
@@ -31,27 +32,42 @@ pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
     }
 }
 
+static PLACEHOLDER_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"<<CODE_BLOCK_(\d+)>>").unwrap()
+});
+
 pub fn restore_code_blocks(summary: &str, code_blocks: &[String]) -> String {
-    let mut final_text = summary.to_string();
-    let mut used_indices = std::collections::HashSet::new();
+    let mut used_indices = vec![false; code_blocks.len()];
 
+    // Single-pass replacement using a regex to find all placeholders.
+    let mut result = PLACEHOLDER_RE
+        .replace_all(summary, |caps: &regex::Captures| {
+            let index: usize = caps
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()
+                .unwrap_or(usize::MAX);
+
+            if index < code_blocks.len() {
+                used_indices[index] = true;
+                code_blocks[index].clone()
+            } else {
+                // If index is invalid, leave it as is.
+                caps.get(0).unwrap().as_str().to_string()
+            }
+        })
+        .to_string();
+
+    // Safety fallback: append orphaned blocks if they were lost in summarization.
     for (i, block) in code_blocks.iter().enumerate() {
-        let placeholder = format!("<<CODE_BLOCK_{}>>", i);
-        if final_text.contains(&placeholder) {
-            final_text = final_text.replace(&placeholder, block);
-            used_indices.insert(i);
+        if !used_indices[i] {
+            result.push_str("\n\n");
+            result.push_str(block);
         }
     }
 
-    // Safety fallback: append orphaned blocks if they were lost in summarization
-    for (i, block) in code_blocks.iter().enumerate() {
-        if !used_indices.contains(&i) {
-            final_text.push_str("\n\n");
-            final_text.push_str(block);
-        }
-    }
-
-    final_text
+    result
 }
 
 #[cfg(test)]

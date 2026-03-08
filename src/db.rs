@@ -1,6 +1,5 @@
 use crate::models::{Message, ProcessingStatus};
 use rusqlite::{Connection, Result, params};
-use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -10,17 +9,19 @@ pub struct Db {
 
 impl Db {
     pub fn new(path: &str) -> Result<Self> {
-        // Ensure parent directory exists
-        if let Some(parent) = Path::new(path)
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty() && !p.exists())
+        // Create the parent directory if it doesn't exist (e.g., /dev/shm/tokenmin/)
+        if path != ":memory:"
+            && let Some(parent) = Path::new(path).parent()
+            && !parent.as_os_str().is_empty()
         {
-            fs::create_dir_all(parent).map_err(|e| {
-                eprintln!("Failed to create database directory {:?}: {}", parent, e);
-                rusqlite::Error::FromSqlConversionFailure(
-                    0,
-                    rusqlite::types::Type::Text,
-                    Box::new(e),
+            std::fs::create_dir_all(parent).map_err(|e| {
+                rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CANTOPEN),
+                    Some(format!(
+                        "Failed to create parent directory '{}': {}",
+                        parent.display(),
+                        e
+                    )),
                 )
             })?;
         }
@@ -43,8 +44,19 @@ impl Db {
         Ok(db)
     }
 
+    /// Acquire the connection lock, converting a poisoned Mutex into a rusqlite error
+    /// instead of panicking, so a single task failure won't bring down the daemon.
+    fn lock_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>> {
+        self.conn.lock().map_err(|e| {
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_MISUSE),
+                Some(format!("Mutex poisoned: {}", e)),
+            )
+        })
+    }
+
     fn init_schema(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,10 +79,10 @@ impl Db {
     pub fn insert_message(&self, message: &Message) -> Result<i64> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "INSERT INTO messages (session_id, role, raw_content, status, model, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -79,36 +91,29 @@ impl Db {
                 &message.role,
                 &message.raw_content,
                 &message.status,
-                &message.model,
+                message.model.as_deref(),
                 now,
             ],
         )?;
         Ok(conn.last_insert_rowid())
     }
 
+    /// Atomically claim all pending messages by transitioning them to `processing`
+    /// using `UPDATE ... RETURNING` to avoid race conditions and double-processing.
     pub fn poll_pending_messages(&self) -> Result<Vec<Message>> {
-        // Use a single timestamp to correlate the messages claimed in this call.
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
 
-        // Atomically claim all currently pending messages by marking them as processing.
-        conn.execute(
+        // Atomically claim all currently pending messages and return them.
+        let mut stmt = conn.prepare(
             "UPDATE messages
              SET status = 'processing', updated_at = ?1
-             WHERE status = 'pending'",
-            params![now],
-        )?;
-
-        // Return only the messages claimed in this call, identified by the shared updated_at.
-        let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, raw_content, processed_content, status, model
-             FROM messages
-             WHERE status = 'processing' AND updated_at = ?1
-             ORDER BY created_at ASC",
+             WHERE status = 'pending'
+             RETURNING id, session_id, role, raw_content, processed_content, status, model",
         )?;
 
         let message_iter = stmt.query_map(params![now], |row| {
@@ -127,6 +132,10 @@ impl Db {
         for message in message_iter {
             messages.push(message?);
         }
+
+        // Ensure FIFO processing order (by ID)
+        messages.sort_by_key(|m| m.id);
+
         Ok(messages)
     }
 
@@ -138,10 +147,10 @@ impl Db {
     ) -> Result<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         conn.execute(
             "UPDATE messages SET status = ?1, processed_content = ?2, updated_at = ?3 WHERE id = ?4",
             params![status, processed_content, now, id],
@@ -152,7 +161,7 @@ impl Db {
     // TODO: Disallow dead_code once the client application is integrated and using these helpers.
     #[allow(dead_code)]
     pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE id = ?1"
         )?;
@@ -194,11 +203,11 @@ mod tests {
         let id = db.insert_message(&msg).unwrap();
         assert!(id > 0);
 
-        let pending = db.poll_pending_messages().unwrap();
-        assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, id);
-        // poll_pending_messages now atomically marks messages as Processing
-        assert_eq!(pending[0].status, ProcessingStatus::Processing);
+        // poll_pending_messages atomically claims messages as 'processing'
+        let claimed = db.poll_pending_messages().unwrap();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].id, id);
+        assert_eq!(claimed[0].status, ProcessingStatus::Processing);
 
         db.update_message(
             id,
