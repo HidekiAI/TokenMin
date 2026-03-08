@@ -23,3 +23,6 @@ target
 # Rust build output
 /target
 
+
+.gemini/
+gha-creds-*.json
