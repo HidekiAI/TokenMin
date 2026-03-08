@@ -32,9 +32,7 @@ pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
     }
 }
 
-static PLACEHOLDER_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"<<CODE_BLOCK_(\d+)>>").unwrap()
-});
+static PLACEHOLDER_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"<<CODE_BLOCK_(\d+)>>").unwrap());
 
 pub fn restore_code_blocks(summary: &str, code_blocks: &[String]) -> String {
     let mut used_indices = vec![false; code_blocks.len()];
@@ -42,12 +40,7 @@ pub fn restore_code_blocks(summary: &str, code_blocks: &[String]) -> String {
     // Single-pass replacement using a regex to find all placeholders.
     let mut result = PLACEHOLDER_RE
         .replace_all(summary, |caps: &regex::Captures| {
-            let index: usize = caps
-                .get(1)
-                .unwrap()
-                .as_str()
-                .parse()
-                .unwrap_or(usize::MAX);
+            let index: usize = caps.get(1).unwrap().as_str().parse().unwrap_or(usize::MAX);
 
             if index < code_blocks.len() {
                 used_indices[index] = true;
