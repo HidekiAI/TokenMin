@@ -111,22 +111,25 @@ impl Db {
         // Atomically claim all currently pending messages and return them.
         let mut stmt = conn.prepare(
             "UPDATE messages
-             SET status = 'processing', updated_at = ?1
-             WHERE status = 'pending'
+             SET status = ?1, updated_at = ?2
+             WHERE status = ?3
              RETURNING id, session_id, role, raw_content, processed_content, status, model",
         )?;
 
-        let message_iter = stmt.query_map(params![now], |row| {
-            Ok(Message {
-                id: row.get(0)?,
-                session_id: row.get(1)?,
-                role: row.get(2)?,
-                raw_content: row.get(3)?,
-                processed_content: row.get(4)?,
-                status: row.get(5)?,
-                model: row.get(6)?,
-            })
-        })?;
+        let message_iter = stmt.query_map(
+            params![ProcessingStatus::Processing, now, ProcessingStatus::Pending],
+            |row| {
+                Ok(Message {
+                    id: row.get(0)?,
+                    session_id: row.get(1)?,
+                    role: row.get(2)?,
+                    raw_content: row.get(3)?,
+                    processed_content: row.get(4)?,
+                    status: row.get(5)?,
+                    model: row.get(6)?,
+                })
+            },
+        )?;
 
         let mut messages = Vec::new();
         for message in message_iter {
