@@ -58,7 +58,7 @@ impl Summarizer {
             "Summarize the following text concisely, retaining all key technical constraints and request details. \
              Do not output conversational filler. \n\n\
              [INPUT_START]\n{}\n[INPUT_END]",
-            text
+            text.replace("[INPUT_END]", "")
         );
 
         let request = OllamaRequest {
