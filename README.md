@@ -27,8 +27,19 @@ While efficiency varies based on the nature of the input, TokenMin aims to:
 TokenMin is currently a work-in-progress. It requires **Ollama** and a **Rust 2024** environment.
 
 ```bash
+# Set up all dependencies (Ollama, Rust, etc.)
+bash ./scripts/setup.sh [local|lxd|docker]
+
 # Set your SQLite path (optimized for shared memory)
 export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
 
+# Configure models to bypass compaction (comma-separated)
+export BYPASS_MODELS="copilot-chat,gpt-3.5-turbo,claude-instant-1"
+
 # Run the watcher
 cargo run --release
+```
+
+- `setup.sh` will call all required setup scripts (Ollama, Rust, etc.) to get the workspace ready for development and testing.
+- **MEMORY.md and INSTRUCTIONS.md must be updated together with README.md whenever approaches change, to keep documentation alive.**
+
