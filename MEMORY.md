@@ -10,11 +10,6 @@
 ## Project Overview
 TokenMin is a Rust-based prompt pre-processor that reduces LLM API consumption by filtering and compressing chat context before sending it to remote providers. It is designed for developers to manage token costs while preserving technical data and code integrity.
 
-## Key Features
-- **Code Sanctuary (Regex-Based):** Code blocks are detected and preserved, bypassing compression to avoid corrupting code logic.
-- **Context Distillation:** Non-code text is summarized using a local SLM (e.g., Qwen 2.5 via Ollama) to create dense, information-rich summaries.
-- **Reassembly:** The original code is reinserted into the compressed summary, maintaining technical accuracy while reducing token count.
-- **Compaction Bypass:** If the target model is free (e.g., Copilot GPT-4.1), compaction is automatically bypassed. No manual override or prompt injection is required.
 
 ## Performance Goals
 - Minimize token waste and financial cost.
