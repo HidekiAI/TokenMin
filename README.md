@@ -16,8 +16,6 @@ TokenMin acts as a "trash compactor" for your LLM context. Instead of sending ra
 2.  **Context Distillation:** The non-code "text" segments are sent to a local SLM (e.g., Qwen 2.5 via Ollama). The model is tasked with generating a dense, information-heavy summary of the conversation history.
 3.  **Reassembly:** The original code is re-inserted into the compressed summary, resulting in a smaller payload that aims to retain the original technical logic while reducing token overhead.
 
-
-
 ## 📊 Performance Goals
 While efficiency varies based on the nature of the input, TokenMin aims to:
 
