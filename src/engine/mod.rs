@@ -25,7 +25,7 @@ impl Engine {
     }
 
     pub fn process_bypass(&self, mut message: Message) -> Message {
-        message.processed_content = Some(message.raw_content.clone());
+        message.processed_content = Some(std::mem::take(&mut message.raw_content));
         message.status = ProcessingStatus::Skipped;
         message
     }
