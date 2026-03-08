@@ -64,7 +64,11 @@ case "$MODE" in
     echo "[setup.sh] Building Docker container for verification..."
     docker build -t tokenmin:latest .
     echo "[setup.sh] Docker build complete. To run:"
-    echo "docker run -e OLLAMA_URL=http://host.docker.internal:11434 -v /tmp/tokenmin:/tmp tokenmin:latest"
+    if [[ "$OS_TYPE" == "Linux" ]]; then
+      echo "docker run --add-host=host.docker.internal:host-gateway -e OLLAMA_URL=http://host.docker.internal:11434 -v /tmp/tokenmin:/tmp tokenmin:latest"
+    else
+      echo "docker run -e OLLAMA_URL=http://host.docker.internal:11434 -v /tmp/tokenmin:/tmp tokenmin:latest"
+    fi
     ;;
   *)
     echo "[setup.sh] Unknown setup mode: $MODE"
