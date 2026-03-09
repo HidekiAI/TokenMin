@@ -1,5 +1,4 @@
 @startuml
-skinparam maxMessageSize 100
 
 actor "Client App\n(e.g., Gemini CLI)" as Client
 database "SQLite\n(/dev/shm)" as DB
