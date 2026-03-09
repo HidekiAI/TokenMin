@@ -86,7 +86,8 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
     match summary_result {
         Ok(summary) => {
             // 4. Reassembly
-            let final_content = restore_code_blocks(&summary, &sanctuary.code_blocks);
+            let final_content =
+                restore_code_blocks(&summary, &sanctuary.code_blocks, &sanctuary.marker);
             let db_clone = Arc::clone(&db);
             match tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Completed, Some(final_content))
