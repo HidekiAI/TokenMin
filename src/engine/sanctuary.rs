@@ -11,7 +11,10 @@ pub struct SanctuaryResult {
 static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
     // Robust regex: support language tags with non-word chars (c++, tsx, objective-c),
     // optional whitespace after the tag, and both Unix (\n) and Windows (\r\n) newlines.
-    Regex::new(r"(?s)```([^\r\n`]*)?\s*\r?\n(.*?)\r?\n?```").unwrap()
+    // (?sm) enables multiline mode (so ^ matches start of line) and dot-matches-all.
+    // We require the opening ``` to be at the start of a line (column 0).
+    // We also require the closing ``` to be at the start of a line.
+    Regex::new(r"(?sm)^```([^\r\n`]*)?\s*\r?\n(.*?)\r?\n^```").unwrap()
 });
 
 pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
@@ -122,6 +125,20 @@ mod tests {
         let final_text = restore_code_blocks(summary, &code_blocks, &marker);
         assert!(final_text.contains("The summary lost the placeholders."));
         assert!(final_text.contains("```rust\nfn main() {}\n```"));
+    }
+
+    #[test]
+    fn test_sanctuary_nested_ticks() {
+        // Ticks that are indented should be ignored.
+        let input = "Here is some text:\n  ```rust\n  fn main() {}\n  ```\nAnd a real block:\n```python\nprint(1)\n```";
+        let result = extract_code_blocks(input);
+
+        // Only the python block at column 0 should be extracted
+        assert_eq!(result.code_blocks.len(), 1);
+        assert!(result.code_blocks[0].contains("print(1)"));
+
+        // The indented rust block should be treated as literal text
+        assert!(result.sanitized_text.contains("  ```rust"));
     }
 
     #[test]

@@ -3,6 +3,7 @@ use std::env;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub db_path: String,
+    pub hmac_secret: String,
     pub ollama_url: String,
     pub ollama_model: String,
     pub bypass_models: Vec<String>,
@@ -15,6 +16,9 @@ impl Config {
 
         let db_path =
             env::var("TOKENMIN_DB").unwrap_or_else(|_| "/dev/shm/tokenmin/queue.db".to_string());
+
+        let hmac_secret =
+            env::var("TOKENMIN_HMAC_SECRET").unwrap_or_else(|_| "default_secret".to_string());
 
         let ollama_url =
             env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
@@ -36,6 +40,7 @@ impl Config {
 
         Self {
             db_path,
+            hmac_secret,
             ollama_url,
             ollama_model,
             bypass_models,

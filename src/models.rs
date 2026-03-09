@@ -77,4 +77,5 @@ pub struct Message {
     pub processed_content: Option<String>,
     pub status: ProcessingStatus,
     pub model: Option<String>,
+    pub hmac_signature: String,
 }
