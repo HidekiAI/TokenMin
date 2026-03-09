@@ -26,47 +26,7 @@ TokenMin acts as a "trash compactor" for your LLM context. Instead of sending ra
 4. **You Read the Result:** Your script, which has been polling the database, sees the status change to `completed`. It reads the newly compacted prompt out of the database.
 5. **You Send to Gemini (Remotely):** Your script *finally* takes that tiny, compacted prompt, attaches your `GEMINI_API_KEY`, and makes the actual HTTP request to Google's Gemini API.
 
-```plantuml
-@startuml
-skinparam maxMessageSize 100
-
-actor "Client App\n(e.g., Gemini CLI)" as Client
-database "SQLite\n(/dev/shm)" as DB
-participant "TokenMin\nDaemon" as TokenMin
-participant "Local SLM\n(Ollama)" as Ollama
-cloud "Remote LLM\n(Gemini API)" as Gemini
-
-== Local Pre-processing Phase ==
-
-Client -> Client : 1. Generate Prompt & HMAC
-Client -> DB : 2. Insert Prompt + HMAC
-activate DB
-TokenMin -> DB : Poll for pending messages
-DB --> TokenMin : Return pending message
-TokenMin -> TokenMin : Verify HMAC Signature
-
-TokenMin -> TokenMin : Extract code blocks (Sanctuary)
-TokenMin -> Ollama : 3. Summarize conversational text
-activate Ollama
-Ollama --> TokenMin : Return dense summary
-deactivate Ollama
-TokenMin -> TokenMin : Reassemble code + summary
-
-TokenMin -> DB : Update status to 'completed' & save processed_content
-
-== Remote Execution Phase ==
-
-Client -> DB : 4. Poll for 'completed' status
-DB --> Client : Return processed_content
-deactivate DB
-
-Client -> Gemini : 5. Send compacted prompt + GEMINI_API_KEY
-activate Gemini
-Gemini --> Client : Return LLM response
-deactivate Gemini
-
-@enduml
-```
+![Architecture Flow](docs/ArchitectureFlow.png)
 
 ## 📊 Performance Goals
 
