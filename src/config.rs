@@ -66,7 +66,7 @@ mod tests {
         // We still need unsafe for set_var in Rust 2024.
         unsafe {
             env::set_var("TOKENMIN_DB", "/tmp/test.db");
-            env::set_var("TOKENMIN_HMAC_SECRET", "test_secret");
+            env::set_var("TOKENMIN_HMAC_SECRET", uuid::Uuid::new_v4().to_string());
             env::set_var("BYPASS_MODELS", "model1, model2 ");
             env::set_var("POLL_INTERVAL_MS", "500");
         }
