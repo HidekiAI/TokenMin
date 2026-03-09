@@ -1,4 +1,3 @@
-
 use hmac::{Hmac, Mac};
 use rusqlite::{Connection, params};
 use sha2::Sha256;
