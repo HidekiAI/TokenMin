@@ -18,7 +18,7 @@ impl Config {
             env::var("TOKENMIN_DB").unwrap_or_else(|_| "/dev/shm/tokenmin/queue.db".to_string());
 
         let hmac_secret =
-            env::var("TOKENMIN_HMAC_SECRET").unwrap_or_else(|_| "default_secret".to_string());
+            env::var("TOKENMIN_HMAC_SECRET").expect("TOKENMIN_HMAC_SECRET must be set")
 
         let ollama_url =
             env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
