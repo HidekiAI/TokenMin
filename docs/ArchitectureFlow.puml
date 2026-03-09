@@ -4,7 +4,7 @@ actor "Client App\n(e.g., Gemini CLI)" as Client
 database "SQLite\n(/dev/shm)" as DB
 participant "TokenMin\nDaemon" as TokenMin
 participant "Local SLM\n(Ollama)" as Ollama
-cloud "Remote LLM\n(Gemini API)" as Gemini
+participant "Remote LLM\n(Gemini API)" as Gemini
 
 == Local Pre-processing Phase ==
 
