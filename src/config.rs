@@ -18,7 +18,7 @@ impl Config {
             env::var("TOKENMIN_DB").unwrap_or_else(|_| "/dev/shm/tokenmin/queue.db".to_string());
 
         let hmac_secret =
-            env::var("TOKENMIN_HMAC_SECRET").expect("TOKENMIN_HMAC_SECRET must be set")
+            env::var("TOKENMIN_HMAC_SECRET").expect("TOKENMIN_HMAC_SECRET must be set");
 
         let ollama_url =
             env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
@@ -66,6 +66,7 @@ mod tests {
         // We still need unsafe for set_var in Rust 2024.
         unsafe {
             env::set_var("TOKENMIN_DB", "/tmp/test.db");
+            env::set_var("TOKENMIN_HMAC_SECRET", "test_secret");
             env::set_var("BYPASS_MODELS", "model1, model2 ");
             env::set_var("POLL_INTERVAL_MS", "500");
         }

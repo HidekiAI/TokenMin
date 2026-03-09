@@ -85,8 +85,8 @@ async fn process_message(
 
     if !is_valid {
         eprintln!(
-            "SECURITY ERROR: HMAC mismatch for message {}. Expected: {}, Computed: {}",
-            id, msg.hmac_signature, computed_hmac
+            "SECURITY ERROR: HMAC mismatch for message {}. Expected: {}",
+            id, msg.hmac_signature
         );
         let db_clone = Arc::clone(&db);
         match tokio::task::spawn_blocking(move || {
