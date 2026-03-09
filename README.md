@@ -18,6 +18,56 @@ TokenMin acts as a "trash compactor" for your LLM context. Instead of sending ra
 2.  **Context Distillation:** The non-code "text" segments are sent to a local SLM (e.g., Qwen 2.5 via Ollama). The model is tasked with generating a dense, information-heavy summary of the conversation history.
 3.  **Reassembly:** The original code is re-inserted into the compressed summary, resulting in a smaller payload that aims to retain the original technical logic while reducing token overhead.
 
+### Architecture Flow
+
+1. **You Generate the Prompt:** Your downstream application (e.g., a script or CLI) creates a massive chat prompt containing code and conversational filler.
+2. **You Give it to TokenMin (Locally):** Instead of sending it straight to Gemini, your script writes the prompt into the local SQLite database (`/dev/shm/chat_and_plan/message_queue.sqlite3`) and signs it with the `TOKENMIN_HMAC_SECRET`.
+3. **TokenMin Compresses (Locally):** The TokenMin daemon wakes up, sees the new message, extracts the code blocks safely, and asks your **local** Ollama instance (e.g., `qwen2.5-coder`) to summarize the conversational filler. It then reassembles the prompt and saves the smaller version back into the database.
+4. **You Read the Result:** Your script, which has been polling the database, sees the status change to `completed`. It reads the newly compacted prompt out of the database.
+5. **You Send to Gemini (Remotely):** Your script *finally* takes that tiny, compacted prompt, attaches your `GEMINI_API_KEY`, and makes the actual HTTP request to Google's Gemini API.
+
+```plantuml
+@startuml
+skinparam maxMessageSize 100
+
+actor "Client App\n(e.g., Gemini CLI)" as Client
+database "SQLite\n(/dev/shm)" as DB
+participant "TokenMin\nDaemon" as TokenMin
+participant "Local SLM\n(Ollama)" as Ollama
+cloud "Remote LLM\n(Gemini API)" as Gemini
+
+== Local Pre-processing Phase ==
+
+Client -> Client : 1. Generate Prompt & HMAC
+Client -> DB : 2. Insert Prompt + HMAC
+activate DB
+TokenMin -> DB : Poll for pending messages
+DB --> TokenMin : Return pending message
+TokenMin -> TokenMin : Verify HMAC Signature
+
+TokenMin -> TokenMin : Extract code blocks (Sanctuary)
+TokenMin -> Ollama : 3. Summarize conversational text
+activate Ollama
+Ollama --> TokenMin : Return dense summary
+deactivate Ollama
+TokenMin -> TokenMin : Reassemble code + summary
+
+TokenMin -> DB : Update status to 'completed' & save processed_content
+
+== Remote Execution Phase ==
+
+Client -> DB : 4. Poll for 'completed' status
+DB --> Client : Return processed_content
+deactivate DB
+
+Client -> Gemini : 5. Send compacted prompt + GEMINI_API_KEY
+activate Gemini
+Gemini --> Client : Return LLM response
+deactivate Gemini
+
+@enduml
+```
+
 ## 📊 Performance Goals
 
 While efficiency varies based on the nature of the input, TokenMin aims to:
