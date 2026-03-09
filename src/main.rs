@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
