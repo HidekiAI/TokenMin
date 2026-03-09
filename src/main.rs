@@ -79,9 +79,11 @@ async fn process_message(
         }
     };
     mac.update(msg.raw_content.as_bytes());
-    let computed_hmac = hex::encode(mac.finalize().into_bytes());
+    let is_valid = hex::decode(&msg.hmac_signature)
+        .map(|expected_mac| mac.verify_slice(&expected_mac).is_ok())
+        .unwrap_or(false);
 
-    if computed_hmac != msg.hmac_signature {
+    if !is_valid {
         eprintln!(
             "SECURITY ERROR: HMAC mismatch for message {}. Expected: {}, Computed: {}",
             id, msg.hmac_signature, computed_hmac
