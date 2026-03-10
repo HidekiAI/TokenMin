@@ -13,8 +13,8 @@ static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
     // optional whitespace after the tag, and both Unix (\n) and Windows (\r\n) newlines.
     // (?sm) enables multiline mode (so ^ matches start of line) and dot-matches-all.
     // We require the opening ``` to be at the start of a line (column 0).
-    // We also require the closing ``` to be at the start of a line.
-    Regex::new(r"(?sm)^```([^\r\n`]*)?\s*\r?\n(.*?)(?:\r?\n)?^```").unwrap()
+    // We also require the closing ``` to be at the start of a line and followed only by whitespace.
+    Regex::new(r"(?sm)^```([^\r\n`]*)?\s*\r?\n(.*?)(?:\r?\n)?^```[ \t]*$").unwrap()
 });
 
 pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
@@ -153,6 +153,15 @@ mod tests {
 
         // The indented rust block should be treated as literal text
         assert!(result.sanitized_text.contains("  ```rust"));
+    }
+
+    #[test]
+    fn test_sanctuary_false_closes() {
+        let input = "```markdown\nHere is a block:\n```json\n{}\n```\nAnd it continues.\n```";
+        let result = extract_code_blocks(input);
+
+        assert_eq!(result.code_blocks.len(), 1);
+        assert!(result.code_blocks[0].contains("```json"));
     }
 
     #[test]
