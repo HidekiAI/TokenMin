@@ -18,7 +18,7 @@ This document outlines the potential architectural paths for integrating the Tok
 ## Summary Recommendations
 
 1. **If sticking to the current Rust architecture (`/dev/shm` SQLite):**
-   Requires writing custom pre-execution hooks for `claude-cli` and `copilot-cli` so they know to drop their payloads into the database and wait for the HMAC-signed response before sending to the cloud. For `gemini-cli`, the built-in `chat_and_plan` tools can be leveraged.
+   Requires writing custom pre-execution hooks for `claude-cli` and `copilot-cli` so they know to drop their payloads into the database and wait for the HMAC-signed response before sending to the cloud. For `gemini-cli`, you can instead reuse its default `chat_and_plan` SQLite database (used for persisting conversations) as the shared queue path, rather than relying on any special tool integration.
 
 2. **For the easiest integration with all CLIs today (The Universal Path):**
    The **Local API Proxy** is historically the path of least resistance. By pointing all CLIs to `localhost:8080`, TokenMin handles the compression invisibly. However, this requires adding an HTTP server layer (like Axum or Warp) to the Rust codebase.
