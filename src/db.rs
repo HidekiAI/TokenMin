@@ -74,10 +74,23 @@ impl Db {
         )?;
 
         // Lightweight migration for existing databases to add the new column
-        let _ = conn.execute(
-            "ALTER TABLE messages ADD COLUMN hmac_signature TEXT NOT NULL DEFAULT ''",
-            [],
-        );
+        let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
+        let mut has_hmac = false;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let name: String = row.get(1)?;
+            if name == "hmac_signature" {
+                has_hmac = true;
+                break;
+            }
+        }
+
+        if !has_hmac {
+            conn.execute(
+                "ALTER TABLE messages ADD COLUMN hmac_signature TEXT NOT NULL DEFAULT ''",
+                [],
+            )?;
+        }
 
         Ok(())
     }
