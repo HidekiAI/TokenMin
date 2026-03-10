@@ -91,3 +91,12 @@ This document outlines the potential architectural paths for integrating the Tok
 
 4. **For deep, "invisible" optimization (Native Plugin/Memory Interception):**
    The **Dynamic Memory Alteration** approach. TokenMin operates entirely in the background, pruning the CLI's session files or context buffers directly. While providing the best user experience (zero blocking), it requires a high degree of coupling with specific CLI internal mechanics or maintaining dedicated plugins.
+
+---
+
+## 🚫 Rejected Options
+
+### Pure MCP Pre-Processor (The Double-Token Penalty)
+Using the Model Context Protocol (Option 3) *exclusively* as a prompt pre-processor is fundamentally flawed for cost-saving purposes. 
+*   **The Problem:** If a user pastes 10,000 lines of raw code into an MCP-compatible CLI, the CLI must first send all 10,000 lines to the cloud LLM to ask, *"Should I use my TokenMin compress tool?"* You pay for the bloated context immediately. The LLM then runs the local tool, receives the 1,000-line compressed summary, and sends *another* request containing the summary.
+*   **The Verdict:** MCP is excellent for *retrieving* historical, pre-compressed memory mid-conversation, but it fails at the primary goal of intercepting and shrinking the initial bloated prompt *before* the first network request is made. A pre-flight intercept (like Option 1 or 5) is mandatory.
