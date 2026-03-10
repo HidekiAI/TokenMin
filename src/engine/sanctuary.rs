@@ -14,7 +14,7 @@ static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
     // (?sm) enables multiline mode (so ^ matches start of line) and dot-matches-all.
     // We require the opening ``` to be at the start of a line (column 0).
     // We also require the closing ``` to be at the start of a line.
-    Regex::new(r"(?sm)^```([^\r\n`]*)?\s*\r?\n(.*?)\r?\n^```").unwrap()
+    Regex::new(r"(?sm)^```([^\r\n`]*)?\s*\r?\n(.*?)(?:\r?\n)?^```").unwrap()
 });
 
 pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
@@ -43,25 +43,39 @@ pub fn extract_code_blocks(text: &str) -> SanctuaryResult {
 
 pub fn restore_code_blocks(summary: &str, code_blocks: &[String], marker: &str) -> String {
     let mut used_indices = vec![false; code_blocks.len()];
+    let prefix = format!("<<CODE_BLOCK_{}_", marker);
+    let suffix = ">>";
 
-    // Dynamically compile a regex for this specific marker to ignore forged placeholders
-    let pattern = format!(r"<<CODE_BLOCK_{}_(\d+)>>", regex::escape(marker));
-    let placeholder_re = Regex::new(&pattern).unwrap();
+    let mut result =
+        String::with_capacity(summary.len() + code_blocks.iter().map(|b| b.len()).sum::<usize>());
+    let mut last_end = 0;
 
-    // Single-pass replacement using the dynamic regex to find all valid placeholders.
-    let mut result = placeholder_re
-        .replace_all(summary, |caps: &regex::Captures| {
-            let index: usize = caps.get(1).unwrap().as_str().parse().unwrap_or(usize::MAX);
+    while let Some(start_idx) = summary[last_end..].find(&prefix) {
+        let absolute_start = last_end + start_idx;
+        result.push_str(&summary[last_end..absolute_start]);
 
-            if index < code_blocks.len() {
+        let search_start = absolute_start + prefix.len();
+        if let Some(end_idx) = summary[search_start..].find(suffix) {
+            let absolute_end = search_start + end_idx;
+            let index_str = &summary[search_start..absolute_end];
+
+            if let Ok(index) = index_str.parse::<usize>()
+                && index < code_blocks.len()
+            {
                 used_indices[index] = true;
-                code_blocks[index].clone()
-            } else {
-                // If index is invalid, leave it as is.
-                caps.get(0).unwrap().as_str().to_string()
+                result.push_str(&code_blocks[index]);
+                last_end = absolute_end + suffix.len();
+                continue;
             }
-        })
-        .to_string();
+        }
+
+        // If we fail to parse, index is out of bounds, or suffix not found:
+        // push the prefix and continue searching from after the prefix.
+        result.push_str(&prefix);
+        last_end = search_start;
+    }
+
+    result.push_str(&summary[last_end..]);
 
     // Safety fallback: append orphaned blocks if they were lost in summarization.
     for (i, block) in code_blocks.iter().enumerate() {

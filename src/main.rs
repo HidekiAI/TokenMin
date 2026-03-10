@@ -78,16 +78,18 @@ async fn process_message(
             return;
         }
     };
+    mac.update(msg.session_id.as_bytes());
+    mac.update(msg.role.as_bytes());
+    if let Some(model) = &msg.model {
+        mac.update(model.as_bytes());
+    }
     mac.update(msg.raw_content.as_bytes());
     let is_valid = hex::decode(&msg.hmac_signature)
         .map(|expected_mac| mac.verify_slice(&expected_mac).is_ok())
         .unwrap_or(false);
 
     if !is_valid {
-        eprintln!(
-            "SECURITY ERROR: HMAC mismatch for message {}. Expected: {}",
-            id, msg.hmac_signature
-        );
+        eprintln!("SECURITY ERROR: HMAC mismatch for message {}", id);
         let db_clone = Arc::clone(&db);
         match tokio::task::spawn_blocking(move || {
             db_clone.update_message(

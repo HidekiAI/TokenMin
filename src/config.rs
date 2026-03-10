@@ -14,8 +14,8 @@ impl Config {
     pub fn from_env() -> Self {
         dotenv::dotenv().ok();
 
-        let db_path =
-            env::var("TOKENMIN_DB").unwrap_or_else(|_| "/dev/shm/tokenmin/queue.db".to_string());
+        let db_path = env::var("TOKENMIN_DB")
+            .unwrap_or_else(|_| "/dev/shm/chat_and_plan/message_queue.sqlite3".to_string());
 
         let hmac_secret =
             env::var("TOKENMIN_HMAC_SECRET").expect("TOKENMIN_HMAC_SECRET must be set");

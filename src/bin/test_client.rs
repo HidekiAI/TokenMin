@@ -7,10 +7,57 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 type HmacSha256 = Hmac<Sha256>;
 
-fn compute_checksum(secret: &str, text: &str) -> String {
+fn compute_checksum(
+    secret: &str,
+    session_id: &str,
+    role: &str,
+    model: Option<&str>,
+    text: &str,
+) -> String {
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(session_id.as_bytes());
+    mac.update(role.as_bytes());
+    if let Some(m) = model {
+        mac.update(m.as_bytes());
+    }
     mac.update(text.as_bytes());
     hex::encode(mac.finalize().into_bytes())
+}
+
+fn poll_for_status(
+    conn: &Connection,
+    msg_id: i64,
+    expected_status: &str,
+    timeout: u64,
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    for _ in 0..timeout {
+        let mut stmt =
+            conn.prepare("SELECT status, processed_content FROM messages WHERE id = ?1")?;
+        let row_result = stmt.query_row(params![msg_id], |row| {
+            let status: String = row.get(0)?;
+            let processed_content: Option<String> = row.get(1)?;
+            Ok((status, processed_content))
+        });
+
+        if let Ok((status, processed_content)) = row_result {
+            if status == expected_status {
+                println!("\n✅ Message processed successfully! Status: {}", status);
+                return Ok(processed_content);
+            } else if status == "failed"
+                || (expected_status == "completed" && status == "skipped")
+                || (expected_status == "skipped" && status == "completed")
+            {
+                println!(
+                    "\n❌ Message processing finished with unexpected status: {}",
+                    status
+                );
+                return Ok(processed_content);
+            }
+            println!("Status is '{}', waiting...", status);
+        }
+        thread::sleep(Duration::from_secs(1));
+    }
+    Err("Timeout waiting for message to process.".into())
 }
 
 fn main() {
@@ -38,7 +85,13 @@ fn main() {
         .as_millis() as i64;
 
     // Test 1: Full Compaction
-    let checksum1 = compute_checksum(&hmac_secret, raw_text);
+    let checksum1 = compute_checksum(
+        &hmac_secret,
+        "test_session",
+        "user",
+        Some("gpt-4"),
+        raw_text,
+    );
     conn.execute(
         "INSERT INTO messages (session_id, role, raw_content, status, model, hmac_signature, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -51,53 +104,28 @@ fn main() {
         msg_id
     );
 
-    let timeout = 20;
-    let mut success = false;
-    for _ in 0..timeout {
-        let mut stmt = conn
-            .prepare("SELECT status, processed_content FROM messages WHERE id = ?1")
-            .unwrap();
-
-        let row_result = stmt.query_row(params![msg_id], |row| {
-            let status: String = row.get(0)?;
-            let processed_content: Option<String> = row.get(1)?;
-            Ok((status, processed_content))
-        });
-
-        if let Ok((status, processed_content)) = row_result {
-            if status == "completed" {
-                println!("\n✅ Message processed successfully!");
-                println!("Status: {}", status);
-                println!("Original Length: {}", raw_text.len());
-                let p_len = processed_content.as_ref().map(|s| s.len()).unwrap_or(0);
-                println!("Processed Length: {}", p_len);
-                println!(
-                    "Processed Content:\n------------------------------\n{}\n------------------------------",
-                    processed_content.unwrap_or_default()
-                );
-                success = true;
-                break;
-            } else if status == "failed" || status == "skipped" {
-                println!(
-                    "\n❌ Message processing finished with unexpected status: {}",
-                    status
-                );
-                println!("Processed Content: {:?}", processed_content);
-                success = true;
-                break;
-            }
-            println!("Status is '{}', waiting...", status);
+    match poll_for_status(&conn, msg_id, "completed", 20) {
+        Ok(content) => {
+            println!("Original Length: {}", raw_text.len());
+            let p_len = content.as_ref().map(|s| s.len()).unwrap_or(0);
+            println!("Processed Length: {}", p_len);
+            println!(
+                "Processed Content:\n------------------------------\n{}\n------------------------------",
+                content.unwrap_or_default()
+            );
         }
-        thread::sleep(Duration::from_secs(1));
-    }
-
-    if !success {
-        println!("Timeout waiting for message to process.");
+        Err(e) => println!("{}", e),
     }
 
     // Test 2: Compaction Bypass
     let bypass_text = "Bypass this! No changes needed.";
-    let checksum2 = compute_checksum(&hmac_secret, bypass_text);
+    let checksum2 = compute_checksum(
+        &hmac_secret,
+        "test_session2",
+        "user",
+        Some("copilot-chat"),
+        bypass_text,
+    );
     conn.execute(
         "INSERT INTO messages (session_id, role, raw_content, status, model, hmac_signature, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -107,42 +135,8 @@ fn main() {
     let bypass_id = conn.last_insert_rowid();
     println!("\n[Test 2] Inserted bypass message with ID: {}", bypass_id);
 
-    // Check bypass completion
-    let mut bypass_success = false;
-    for _ in 0..timeout {
-        let mut stmt = conn
-            .prepare("SELECT status, processed_content FROM messages WHERE id = ?1")
-            .unwrap();
-        let row_result = stmt.query_row(params![bypass_id], |row| {
-            let status: String = row.get(0)?;
-            let processed_content: Option<String> = row.get(1)?;
-            Ok((status, processed_content))
-        });
-
-        if let Ok((status, processed_content)) = row_result {
-            if status == "skipped" {
-                println!("\n✅ Bypass message processed successfully!");
-                println!("Status: {}", status);
-                println!(
-                    "Processed Content: {}",
-                    processed_content.unwrap_or_default()
-                );
-                bypass_success = true;
-                break;
-            } else if status == "failed" || status == "completed" {
-                println!(
-                    "\n❌ Bypass message processing finished with unexpected status: {}",
-                    status
-                );
-                bypass_success = true;
-                break;
-            }
-            println!("Bypass Status is '{}', waiting...", status);
-        }
-        thread::sleep(Duration::from_secs(1));
-    }
-
-    if !bypass_success {
-        println!("Timeout waiting for bypass message to process.");
+    match poll_for_status(&conn, bypass_id, "skipped", 20) {
+        Ok(content) => println!("Processed Content: {}", content.unwrap_or_default()),
+        Err(e) => println!("{}", e),
     }
 }

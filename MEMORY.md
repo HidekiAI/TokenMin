@@ -1,6 +1,8 @@
 # TokenMin MEMORY.md (compact)
 
 - Rust tool for compressing LLM prompts, preserving code blocks.
+- Uses strict code-fence parsing and UUIDv4 cryptographic prompt-binding.
+- SQLite DB queue is protected by HMAC-SHA256 verification.
 - Summarizes non-code text locally (Qwen 2.5 via Ollama).
 - Automatically bypasses compaction for free models (e.g., Copilot GPT-4.1).
 - Fast, private, uses shared memory (SQLite).
@@ -18,9 +20,10 @@ TokenMin is a Rust-based prompt pre-processor that reduces LLM API consumption b
 
 ## Quick Start
 - Requires Ollama and Rust 2024.
-- Set SQLite path (optimized for shared memory):
+- Set SQLite path (optimized for shared memory) and your HMAC secret:
   ```bash
   export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
+  export TOKENMIN_HMAC_SECRET="your-secure-random-secret"
   ```
 - Run the watcher:
   ```bash
