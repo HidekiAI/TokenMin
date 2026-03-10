@@ -1,7 +1,7 @@
 # TokenMin MEMORY.md (compact)
 
 - Rust tool for compressing LLM prompts, preserving code blocks.
-- Uses strict code-fence parsing and UUIDv4 cryptographic prompt-binding.
+- Uses strict code-fence parsing and random UUIDv4 markers to prevent placeholder forgery/collision.
 - SQLite DB queue is protected by HMAC-SHA256 verification.
 - Summarizes non-code text locally (Qwen 2.5 via Ollama).
 - Automatically bypasses compaction for free models (e.g., Copilot GPT-4.1).
