@@ -48,6 +48,7 @@ mod tests {
             processed_content: None,
             status: ProcessingStatus::Pending,
             model: Some("copilot-chat".into()),
+            hmac_signature: "dummy".into(),
         };
 
         let msg_to_process = Message {
@@ -58,6 +59,7 @@ mod tests {
             processed_content: None,
             status: ProcessingStatus::Pending,
             model: Some("gpt-4".into()),
+            hmac_signature: "dummy".into(),
         };
 
         assert!(engine.should_bypass(&msg_to_bypass));

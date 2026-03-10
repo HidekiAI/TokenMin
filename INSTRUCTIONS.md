@@ -7,9 +7,10 @@
 - **Build:**
   - `cargo run --release` (requires Rust 2024)
 - **Environment:**
-  - Set the SQLite path for shared memory optimization:
+  - Set the SQLite path for shared memory optimization and your HMAC shared secret:
     ```bash
     export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
+    export TOKENMIN_HMAC_SECRET="your-secure-random-secret"
     ```
 - **Testing and Linting:**
   - Format code with `cargo fmt`.
@@ -19,10 +20,11 @@
 ## High-Level Architecture
 - **Purpose:** TokenMin is a Rust-based prompt pre-processor that reduces LLM API token usage by filtering and compressing chat context before sending it to remote providers.
 - **Pipeline:**
-  1. **Code Sanctuary:** Code blocks (detected via regex) are preserved and bypass compression to avoid corrupting code logic.
-  2. **Context Distillation:** Non-code text is summarized using a local SLM (e.g., Qwen 2.5 via Ollama) to create dense, information-rich summaries.
-  3. **Reassembly:** The original code is reinserted into the compressed summary, maintaining technical accuracy while reducing token count.
-  4. **Compaction Bypass:** If the target model is free (e.g., Copilot GPT-4.1), compaction is automatically bypassed. No manual override or prompt injection is required.
+  1. **Integrity Check:** The local SQLite DB is protected via HMAC-SHA256. Incoming messages are rejected if they lack a valid signature.
+  2. **Code Sanctuary:** Code blocks (detected via strict regex) are preserved and bypass compression using randomized UUIDv4 markers to prevent prompt-injection forgery.
+  3. **Context Distillation:** Non-code text is summarized using a local SLM (e.g., Qwen 2.5 via Ollama) to create dense, information-rich summaries.
+  4. **Reassembly:** The original code is reinserted into the compressed summary, maintaining technical accuracy while reducing token count.
+  5. **Compaction Bypass:** If the target model is free (e.g., Copilot GPT-4.1), compaction is automatically bypassed. No manual override or prompt injection is required.
 - **Performance:**
   - Uses Rust concurrency and `/dev/shm` shared memory for low-latency database polling.
   - All summarization and scrubbing is performed locally for privacy.

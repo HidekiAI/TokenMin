@@ -66,11 +66,32 @@ impl Db {
                 processed_content TEXT,
                 status TEXT NOT NULL,
                 model TEXT,
+                hmac_signature TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER
             )",
             [],
         )?;
+
+        // Lightweight migration for existing databases to add the new column
+        let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
+        let mut has_hmac = false;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let name: String = row.get(1)?;
+            if name == "hmac_signature" {
+                has_hmac = true;
+                break;
+            }
+        }
+
+        if !has_hmac {
+            conn.execute(
+                "ALTER TABLE messages ADD COLUMN hmac_signature TEXT NOT NULL DEFAULT ''",
+                [],
+            )?;
+        }
+
         Ok(())
     }
 
@@ -84,14 +105,15 @@ impl Db {
 
         let conn = self.lock_conn()?;
         conn.execute(
-            "INSERT INTO messages (session_id, role, raw_content, status, model, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO messages (session_id, role, raw_content, status, model, hmac_signature, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 &message.session_id,
                 &message.role,
                 &message.raw_content,
                 &message.status,
                 message.model.as_deref(),
+                &message.hmac_signature,
                 now,
             ],
         )?;
@@ -113,7 +135,7 @@ impl Db {
             "UPDATE messages
              SET status = ?1, updated_at = ?2
              WHERE status = ?3
-             RETURNING id, session_id, role, raw_content, processed_content, status, model",
+             RETURNING id, session_id, role, raw_content, processed_content, status, model, hmac_signature",
         )?;
 
         let message_iter = stmt.query_map(
@@ -127,6 +149,7 @@ impl Db {
                     processed_content: row.get(4)?,
                     status: row.get(5)?,
                     model: row.get(6)?,
+                    hmac_signature: row.get(7)?,
                 })
             },
         )?;
@@ -166,7 +189,7 @@ impl Db {
     pub fn get_message_by_id(&self, id: i64) -> Result<Message> {
         let conn = self.lock_conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, session_id, role, raw_content, processed_content, status, model FROM messages WHERE id = ?1"
+            "SELECT id, session_id, role, raw_content, processed_content, status, model, hmac_signature FROM messages WHERE id = ?1"
         )?;
 
         stmt.query_row(params![id], |row| {
@@ -178,6 +201,7 @@ impl Db {
                 processed_content: row.get(4)?,
                 status: row.get(5)?,
                 model: row.get(6)?,
+                hmac_signature: row.get(7)?,
             })
         })
     }
@@ -201,6 +225,7 @@ mod tests {
             processed_content: None,
             status: ProcessingStatus::Pending,
             model: Some("gpt-4".into()),
+            hmac_signature: "dummy_checksum".into(),
         };
 
         let id = db.insert_message(&msg).unwrap();
@@ -211,6 +236,7 @@ mod tests {
         assert_eq!(claimed.len(), 1);
         assert_eq!(claimed[0].id, id);
         assert_eq!(claimed[0].status, ProcessingStatus::Processing);
+        assert_eq!(claimed[0].hmac_signature, "dummy_checksum");
 
         db.update_message(
             id,
@@ -239,6 +265,7 @@ mod tests {
             processed_content: None,
             status: ProcessingStatus::Pending,
             model: None,
+            hmac_signature: "dummy".into(),
         };
         let id = db.insert_message(&msg).unwrap();
 

@@ -3,6 +3,7 @@ use std::env;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub db_path: String,
+    pub hmac_secret: String,
     pub ollama_url: String,
     pub ollama_model: String,
     pub bypass_models: Vec<String>,
@@ -13,8 +14,15 @@ impl Config {
     pub fn from_env() -> Self {
         dotenv::dotenv().ok();
 
-        let db_path =
-            env::var("TOKENMIN_DB").unwrap_or_else(|_| "/dev/shm/tokenmin/queue.db".to_string());
+        let db_path = env::var("TOKENMIN_DB")
+            .unwrap_or_else(|_| "/dev/shm/chat_and_plan/message_queue.sqlite3".to_string());
+
+        let hmac_secret =
+            env::var("TOKENMIN_HMAC_SECRET").expect("TOKENMIN_HMAC_SECRET must be set");
+        assert!(
+            hmac_secret.len() >= 32,
+            "TOKENMIN_HMAC_SECRET must be at least 32 bytes long for security."
+        );
 
         let ollama_url =
             env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
@@ -36,6 +44,7 @@ impl Config {
 
         Self {
             db_path,
+            hmac_secret,
             ollama_url,
             ollama_model,
             bypass_models,
@@ -61,6 +70,7 @@ mod tests {
         // We still need unsafe for set_var in Rust 2024.
         unsafe {
             env::set_var("TOKENMIN_DB", "/tmp/test.db");
+            env::set_var("TOKENMIN_HMAC_SECRET", uuid::Uuid::new_v4().to_string());
             env::set_var("BYPASS_MODELS", "model1, model2 ");
             env::set_var("POLL_INTERVAL_MS", "500");
         }

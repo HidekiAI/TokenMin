@@ -13,6 +13,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+
+type HmacSha256 = Hmac<Sha256>;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("TokenMin started.");
@@ -20,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env();
     let db = Arc::new(Db::new(&config.db_path)?);
     let engine = Engine::new(config.bypass_models.clone());
+    let hmac_secret = Arc::new(config.hmac_secret.clone());
 
     // Summarizer::new now returns a Result
     let summarizer = Summarizer::new(config.ollama_url.clone(), config.ollama_model.clone())
@@ -38,7 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match poll_handle {
             Ok(Ok(messages)) => {
                 for msg in messages {
-                    process_message(Arc::clone(&db), &engine, &summarizer, msg).await;
+                    process_message(
+                        Arc::clone(&db),
+                        &engine,
+                        &summarizer,
+                        msg,
+                        Arc::clone(&hmac_secret),
+                    )
+                    .await;
                 }
             }
             Ok(Err(e)) => eprintln!("Database poll error: {}", e),
@@ -48,9 +60,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, msg: Message) {
+async fn process_message(
+    db: Arc<Db>,
+    engine: &Engine,
+    summarizer: &Summarizer,
+    msg: Message,
+    hmac_secret: Arc<String>,
+) {
     let id = msg.id;
     println!("Processing message ID: {}", id);
+
+    // 0. Cryptographic HMAC Verification
+    let mut mac = match HmacSha256::new_from_slice(hmac_secret.as_bytes()) {
+        Ok(mac) => mac,
+        Err(_) => {
+            eprintln!("SECURITY ERROR: Invalid HMAC secret key length");
+            return;
+        }
+    };
+    mac.update(&(msg.session_id.len() as u32).to_le_bytes());
+    mac.update(msg.session_id.as_bytes());
+    mac.update(&(msg.role.len() as u32).to_le_bytes());
+    mac.update(msg.role.as_bytes());
+    if let Some(model) = &msg.model {
+        mac.update(&[1]);
+        mac.update(&(model.len() as u32).to_le_bytes());
+        mac.update(model.as_bytes());
+    } else {
+        mac.update(&[0]);
+    }
+    mac.update(&(msg.raw_content.len() as u32).to_le_bytes());
+    mac.update(msg.raw_content.as_bytes());
+    let is_valid = hex::decode(&msg.hmac_signature)
+        .map(|expected_mac| mac.verify_slice(&expected_mac).is_ok())
+        .unwrap_or(false);
+
+    if !is_valid {
+        eprintln!("SECURITY ERROR: HMAC mismatch for message {}", id);
+        let db_clone = Arc::clone(&db);
+        match tokio::task::spawn_blocking(move || {
+            db_clone.update_message(
+                id,
+                ProcessingStatus::Failed,
+                Some(
+                    "ERROR: Integrity check failed. Payload was tampered with before processing."
+                        .into(),
+                ),
+            )
+        })
+        .await
+        {
+            Ok(Err(e)) => eprintln!("Failed to update tampered message {}: {}", id, e),
+            Err(e) => eprintln!("Task panicked updating tampered message {}: {}", id, e),
+            Ok(Ok(())) => {}
+        }
+        return;
+    }
 
     // 1. Bypass Check
     if engine.should_bypass(&msg) {
@@ -86,7 +151,8 @@ async fn process_message(db: Arc<Db>, engine: &Engine, summarizer: &Summarizer, 
     match summary_result {
         Ok(summary) => {
             // 4. Reassembly
-            let final_content = restore_code_blocks(&summary, &sanctuary.code_blocks);
+            let final_content =
+                restore_code_blocks(&summary, &sanctuary.code_blocks, &sanctuary.marker);
             let db_clone = Arc::clone(&db);
             match tokio::task::spawn_blocking(move || {
                 db_clone.update_message(id, ProcessingStatus::Completed, Some(final_content))
