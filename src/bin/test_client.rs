@@ -15,11 +15,18 @@ fn compute_checksum(
     text: &str,
 ) -> String {
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+    mac.update(&(session_id.len() as u32).to_le_bytes());
     mac.update(session_id.as_bytes());
+    mac.update(&(role.len() as u32).to_le_bytes());
     mac.update(role.as_bytes());
     if let Some(m) = model {
+        mac.update(&[1]);
+        mac.update(&(m.len() as u32).to_le_bytes());
         mac.update(m.as_bytes());
+    } else {
+        mac.update(&[0]);
     }
+    mac.update(&(text.len() as u32).to_le_bytes());
     mac.update(text.as_bytes());
     hex::encode(mac.finalize().into_bytes())
 }

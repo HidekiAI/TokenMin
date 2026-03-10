@@ -78,11 +78,18 @@ async fn process_message(
             return;
         }
     };
+    mac.update(&(msg.session_id.len() as u32).to_le_bytes());
     mac.update(msg.session_id.as_bytes());
+    mac.update(&(msg.role.len() as u32).to_le_bytes());
     mac.update(msg.role.as_bytes());
     if let Some(model) = &msg.model {
+        mac.update(&[1]);
+        mac.update(&(model.len() as u32).to_le_bytes());
         mac.update(model.as_bytes());
+    } else {
+        mac.update(&[0]);
     }
+    mac.update(&(msg.raw_content.len() as u32).to_le_bytes());
     mac.update(msg.raw_content.as_bytes());
     let is_valid = hex::decode(&msg.hmac_signature)
         .map(|expected_mac| mac.verify_slice(&expected_mac).is_ok())
