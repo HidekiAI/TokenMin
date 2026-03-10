@@ -9,7 +9,7 @@
 - **Environment:**
   - Set the SQLite path for shared memory optimization and your HMAC shared secret:
     ```bash
-    export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
+    export TOKENMIN_DB="/dev/shm/tokenmin/message_queue.sqlite3"
     export TOKENMIN_HMAC_SECRET="your-secure-random-secret"
     ```
 - **Testing and Linting:**

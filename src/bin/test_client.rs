@@ -69,7 +69,7 @@ fn poll_for_status(
 
 fn main() {
     let db_path = env::var("TOKENMIN_DB")
-        .unwrap_or_else(|_| "/dev/shm/chat_and_plan/message_queue.sqlite3".to_string());
+        .unwrap_or_else(|_| "/dev/shm/tokenmin/message_queue.sqlite3".to_string());
     let hmac_secret =
         env::var("TOKENMIN_HMAC_SECRET").unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
 

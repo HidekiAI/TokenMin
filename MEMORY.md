@@ -22,7 +22,7 @@ TokenMin is a Rust-based prompt pre-processor that reduces LLM API consumption b
 - Requires Ollama and Rust 2024.
 - Set SQLite path (optimized for shared memory) and your HMAC secret:
   ```bash
-  export TOKENMIN_DB="/dev/shm/chat_and_plan/message_queue.sqlite3"
+  export TOKENMIN_DB="/dev/shm/tokenmin/message_queue.sqlite3"
   export TOKENMIN_HMAC_SECRET="your-secure-random-secret"
   ```
 - Run the watcher:

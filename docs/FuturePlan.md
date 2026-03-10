@@ -18,7 +18,7 @@ This document outlines the potential architectural paths for integrating the Tok
 ## 🔍 Detailed Breakdown
 
 ### 1. Shared Memory SQLite Queue (Current Design)
-**Core Mechanism:** CLIs write/read prompts to the shared queue DB configured via `$TOKENMIN_DB` (default `/dev/shm/chat_and_plan/message_queue.sqlite3`). The TokenMin daemon watches and processes them asynchronously.
+**Core Mechanism:** CLIs write/read prompts to the shared queue DB configured via `$TOKENMIN_DB` (default `/dev/shm/tokenmin/message_queue.sqlite3`). The TokenMin daemon watches and processes them asynchronously.
 
 *   **Pros:**
     *   **Extremely High Performance:** Sub-millisecond reads/writes via RAM disk (`/dev/shm`).
