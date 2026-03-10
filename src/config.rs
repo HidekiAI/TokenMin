@@ -19,6 +19,10 @@ impl Config {
 
         let hmac_secret =
             env::var("TOKENMIN_HMAC_SECRET").expect("TOKENMIN_HMAC_SECRET must be set");
+        assert!(
+            hmac_secret.len() >= 32,
+            "TOKENMIN_HMAC_SECRET must be at least 32 bytes long for security."
+        );
 
         let ollama_url =
             env::var("OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
