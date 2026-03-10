@@ -9,7 +9,7 @@ This document outlines the potential architectural paths for integrating the Tok
 | **Performance** | Extremely High | Medium | High | High | Extremely High |
 | **CLI Compatibility** | Low/Medium | Very High | Medium/Growing | Low/Medium | Low (Highly Coupled) |
 | **Security (Local)** | High (Request only) | Medium | High | High | High |
-| **Asynchronous UI** | Excellent | Poor (Blocking) | Poor (Blocking) | Poor (Blocking) | Excellent |
+| **Asynchronous Capability** | Excellent | Poor (Blocking) | Poor (Blocking) | Poor (Blocking) | Excellent |
 | **Effort (TokenMin)** | Done (Current) | High | Medium | Medium | High |
 | **Effort (CLIs)** | High | Low | Low | High | High |
 
