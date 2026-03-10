@@ -35,18 +35,22 @@ You can write a Command Hook or a native CLI Extension that listens for the `Bef
 
 ---
 
-## Alternatives
+## 🚫 Rejected Alternatives
 
-If you prefer to fork the `gemini-cli` repository or hardcode TokenMin as a core feature, there are two alternative integration points:
+During the architectural evaluation, we considered two other integration points within the `gemini-cli` source code. Both were rejected because they would require maintaining a hard fork of the `gemini-cli` repository, which violates our goal of a native, seamless integration.
 
 ### 1. Direct Integration: Modifying `GeminiChat`
 **Location:** `packages/core/src/core/geminiChat.ts` (inside `makeApiCallAndProcessStream`)
 
-Rather than using the Hook System, you can hardcode TokenMin directly into the chat lifecycle. You would inject TokenMin directly before `this.client.generateContentStream` or `fireBeforeModelEvent` is called, explicitly waiting for the SQLite queue to return the compressed `requestContents` buffer before proceeding.
+Instead of using the Hook System, this approach involved hardcoding TokenMin directly into the chat lifecycle. We would inject TokenMin directly before `this.client.generateContentStream` or `fireBeforeModelEvent` is called, explicitly waiting for the SQLite queue to return the compressed `requestContents` buffer before proceeding. 
+
+**Why it was rejected:** Requires maintaining a permanent fork of `gemini-cli` just to inject the SQLite polling logic.
 
 ### 2. The Native Replacement: `ChatCompressionService`
 **Location:** `packages/core/src/services/chatCompressionService.ts`
 
 `gemini-cli` actually has a native compression service! By default, it uses a generic LLM summarization technique when the `DEFAULT_COMPRESSION_TOKEN_THRESHOLD` (50% of the model's token limit) is reached.
 
-Rather than treating TokenMin as an external proxy or a pre-flight hook, you could replace or extend the `compress()` method in `ChatCompressionService`. When the CLI realizes the context is getting too large, it would invoke your TokenMin Rust daemon via SQLite instead of its default local TypeScript token-pruning logic.
+This approach involved replacing or extending the `compress()` method in `ChatCompressionService`. When the CLI realized the context was getting too large, it would invoke the TokenMin Rust daemon via SQLite instead of its default local TypeScript token-pruning logic.
+
+**Why it was rejected:** While semantically the "correct" place for compression logic, extending this internal class currently requires modifying the source code and maintaining a fork, whereas the `BeforeModel` hook provides the same prompt-interception capability via officially supported extensions.
