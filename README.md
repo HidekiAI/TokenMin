@@ -28,6 +28,23 @@ TokenMin acts as a "trash compactor" for your LLM context. Instead of sending ra
 
 ![Architecture Flow](docs/ArchitectureFlow.png)
 
+## 🔌 CLI Integrations (Future Plans)
+
+TokenMin is designed to be a universal "trash compactor" for any CLI-based AI assistant (e.g., `gemini-cli`, `claude-cli`, `copilot-cli`). We have evaluated multiple architectural paths for achieving this, including:
+- Shared Memory SQLite Queues
+- Local API HTTP Proxies
+- Model Context Protocol (MCP) Servers
+- Native Extension APIs
+
+For a full matrix of these options, pros, and cons, see [docs/FuturePlan.md](docs/FuturePlan.md).
+
+### First Target: `gemini-cli`
+Based on our architectural evaluation, our primary, initial integration target will be **[Gemini CLI](https://github.com/google/gemini-cli)**. 
+
+Rather than building a brittle proxy server or requiring upstream forks, we will utilize Gemini CLI's native hook system. Specifically, we will leverage the `BeforeModel` hook to intercept the massive chat history buffer, push it through TokenMin's local SQLite queue, and return the compacted version right before the HTTP request is fired.
+
+For deep-dive documentation on this specific integration strategy, see [docs/GeminiChatHook.md](docs/GeminiChatHook.md).
+
 ## 📊 Performance Goals
 
 While efficiency varies based on the nature of the input, TokenMin aims to:
