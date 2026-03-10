@@ -64,15 +64,17 @@ This document outlines the potential architectural paths for integrating the Tok
 *   **Best Used When:** You want a quick, pipeline-driven approach for one-off CLI tasks, once a streaming helper exists.
 
 ### 5. Native Plugins & Dynamic Memory Alteration
-**Core Mechanism:** TokenMin acts as a background agent that silently compresses the CLI's internal JSON session state or file-system context buffer *before* the CLI reads it, OR integrates via native CLI extension APIs.
+**Core Mechanism:** TokenMin acts as an intelligent background archivist that integrates directly into the agent's internal state machine or extension API. This includes:
+1. **SDK State Interception:** Silently compressing local session files (e.g., Anthropic's JSONL session history or `MEMORY.md`) *before* the CLI reads them to resume a session.
+2. **Agentic Memory APIs:** Acting as the storage backend for an agent's explicit memory tools (e.g., Claude's Beta Memory API), where the agent explicitly requests TokenMin to `create`, `view`, or `str_replace` long-term facts.
 
 *   **Pros:**
-    *   **Zero Latency Overhead:** Compression happens entirely asynchronously in the background. The CLI doesn't wait for compression at request time.
-    *   **Magic Experience:** The CLI unknowingly uses optimized prompts, providing the best user experience.
+    *   **Zero Latency Overhead:** For session state interception, compression happens entirely asynchronously in the background.
+    *   **Semantic Power:** When combined with Memory APIs, TokenMin becomes a smart knowledge-retrieval engine rather than just a dumb prompt-pipe.
 *   **Cons:**
-    *   **Brittle:** Depends heavily on specific, undocumented file structures of individual CLIs, or their specific plugin APIs.
+    *   **Brittle/Coupled:** Depends heavily on specific, undocumented file structures of individual CLIs, specific SDK schemas, or beta APIs.
     *   **High Maintenance:** Requires complex file-locking, reverse-engineering session states, or maintaining plugins specific to each CLI tool.
-*   **Best Used When:** You want a "magic" asynchronous integration where the CLI unknowingly uses optimized prompts, and you are willing to maintain highly coupled integration logic.
+*   **Best Used When:** You want a "magic" asynchronous integration (SDK Interception) or want TokenMin to manage long-term cross-session knowledge (Memory API integration), and are willing to maintain highly coupled logic.
 
 ---
 
