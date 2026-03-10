@@ -6,7 +6,7 @@ This document outlines the potential architectural paths for integrating the Tok
 
 | Feature | 1. Shared SQLite Queue | 2. Local API Proxy | 3. MCP Server | 4. Shell Wrappers | 5. Native Plugins / Memory |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Latency / Performance** | Extremely High | Medium | High | High | Extremely High |
+| **Performance** | Extremely High | Medium | High | High | Extremely High |
 | **CLI Compatibility** | Low/Medium | Very High | Medium/Growing | Low/Medium | Low (Highly Coupled) |
 | **Security (Local)** | High (Request only) | Medium | High | High | High |
 | **Asynchronous UI** | Excellent | Poor (Blocking) | Poor (Blocking) | Poor (Blocking) | Excellent |
