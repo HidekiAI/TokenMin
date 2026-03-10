@@ -89,7 +89,7 @@ This document outlines the potential architectural paths for integrating the Tok
 3. **For the most "Agentic" approach (The Future Standard):**
    The **MCP Server** approach. Adapting TokenMin to speak the Model Context Protocol over `stdio` allows modern, MCP-compatible agents to natively understand they possess a "Compression Engine" tool and decide when to use it.
 
-4. **For deep, "invisible" optimization (Native Plugin/Memory Interception):**
+4. **For deep, "invisible" optimization (Native Plugins & Dynamic Memory Alteration):**
    The **Dynamic Memory Alteration** approach. TokenMin operates entirely in the background, pruning the CLI's session files or context buffers directly. While providing the best user experience (zero blocking), it requires a high degree of coupling with specific CLI internal mechanics or maintaining dedicated plugins.
 
 ---
