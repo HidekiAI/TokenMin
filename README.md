@@ -64,7 +64,7 @@ TokenMin is currently a work-in-progress. It requires **Ollama** and a **Rust 20
 # Set up all dependencies (Ollama, Rust, etc.)
 bash ./scripts/setup.sh [local|lxd|docker]
 
-# Set your SQLite path (optimized for shared memory)
+# Set your SQLite path (optimized for shared memory; this is the canonical default)
 export TOKENMIN_DB="/dev/shm/tokenmin/message_queue.sqlite3"
 
 # Set your HMAC shared secret to secure the SQLite database
