@@ -18,8 +18,9 @@ This document outlines the potential architectural paths for integrating the Tok
 ## 🔍 Detailed Breakdown
 
 ### 1. Shared Memory SQLite Queue (Current Design)
-**Core Mechanism:** CLIs write/read prompts to the shared queue DB configured via `$TOKENMIN_DB` (default `/dev/shm/tokenmin/message_queue.sqlite3`). The TokenMin daemon watches and processes them asynchronously.
+**Core Mechanism:** CLIs write/read prompts to a **dedicated TokenMin queue database** configured via `$TOKENMIN_DB` (default `/dev/shm/tokenmin/message_queue.sqlite3`). The TokenMin daemon watches and processes these queue records asynchronously.
 
+> Note: `$TOKENMIN_DB` is intended for TokenMin's own queue schema only. It should **not** be pointed at an existing CLI persistence database (such as `gemini-cli`’s default `chat_and_plan` SQLite DB) unless you explicitly add the required schema and integration logic (for example via a `BeforeModel` / pre-request hook). Treat the shared queue as an integration boundary, not a drop-in replacement for a CLI’s internal storage.
 *   **Pros:**
     *   **Extremely High Performance:** Sub-millisecond reads/writes via RAM disk (`/dev/shm`).
     *   **Asynchronous:** TokenMin runs as a background daemon. Prompts queue and process independently.
