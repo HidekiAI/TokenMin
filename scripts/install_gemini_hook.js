@@ -43,9 +43,8 @@ async function main() {
     }
 
     const possiblePaths = [
-        path.join(process.env.HOME || process.env.USERPROFILE, '.gemini', 'gemini.config.json'),
-        path.join(process.env.HOME || process.env.USERPROFILE, '.config', 'gemini', 'gemini.config.json'),
-        path.join(process.cwd(), 'gemini.config.json') // Fallback to cwd
+        path.join(process.env.HOME || process.env.USERPROFILE, '.gemini', 'settings.json'),
+        path.join(process.cwd(), '.gemini', 'settings.json') // Fallback to workspace settings
     ];
     
     let configPath = null;
@@ -57,8 +56,8 @@ async function main() {
     }
     
     if (!configPath) {
-        console.log('Could not automatically locate gemini.config.json.');
-        console.log('We will create a new config file in ~/.gemini/gemini.config.json if you press Enter, or you can specify a custom path.');
+        console.log('Could not automatically locate settings.json.');
+        console.log('We will create a new config file in ~/.gemini/settings.json if you press Enter, or you can specify a custom path.');
         const answer = await askQuestion('Path to config directory (Press Enter for ~/.gemini/): ');
         
         let targetDir;
@@ -75,10 +74,10 @@ async function main() {
             fs.mkdirSync(targetDir, { recursive: true });
         }
         
-        configPath = path.join(targetDir, 'gemini.config.json');
+        configPath = path.join(targetDir, 'settings.json');
         if (!fs.existsSync(configPath)) {
             console.log(`Creating new config file at: ${configPath}`);
-            fs.writeFileSync(configPath, JSON.stringify({ plugins: [] }, null, 2));
+            fs.writeFileSync(configPath, JSON.stringify({ hooks: {} }, null, 2));
         }
     }
     
@@ -86,7 +85,7 @@ async function main() {
     const configDir = path.dirname(configPath);
     
     // Step 3: Copy WASM and generate wrapper
-    console.log('\n[3/4] Installing plugin files...');
+    console.log('\n[3/4] Installing hook files...');
     
     const tokenminDir = path.join(configDir, 'tokenmin');
     if (!fs.existsSync(tokenminDir)) {
@@ -103,71 +102,80 @@ async function main() {
     // Copy the WASM files over
     fs.cpSync(pkgDir, path.join(tokenminDir, 'pkg'), { recursive: true });
     
-    // Generate Wrapper Plugin
-    const pluginPath = path.join(tokenminDir, 'tokenmin-plugin.js');
+    // Generate Wrapper Plugin (Node script that calls WASM)
+    const pluginPath = path.join(tokenminDir, 'tokenmin-hook.js');
     const wrapperCode = `
-// TokenMin Gemini CLI Extension Wrapper
+// TokenMin Gemini CLI Hook
 const { TokenMinWasm } = require('./pkg/token_min.js');
 
-let tokenmin = null;
+const bypassModels = process.env.TOKENMIN_BYPASS_MODELS ? process.env.TOKENMIN_BYPASS_MODELS.split(',') : ['copilot-chat', 'gpt-3.5-turbo'];
+const summarizerUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+const summarizerModel = process.env.TOKENMIN_SUMMARIZER_MODEL || 'qwen2.5-coder';
 
-function initTokenMin(config) {
-    if (!tokenmin) {
-        const bypassModels = config.tokenmin?.bypassModels || ['copilot-chat', 'gpt-3.5-turbo'];
-        const summarizerUrl = config.tokenmin?.summarizerUrl || process.env.OLLAMA_URL || 'http://localhost:11434';
-        const summarizerModel = config.tokenmin?.summarizerModel || 'qwen2.5-coder';
+const tokenmin = new TokenMinWasm(bypassModels, summarizerUrl, summarizerModel);
+
+// Hook input is provided as a JSON string via process.argv[2]
+const input = JSON.parse(process.argv[2]);
+
+async function run() {
+    try {
+        const rawContent = JSON.stringify(input.llm_request.contents);
+        const model = input.llm_request.model;
         
-        tokenmin = new TokenMinWasm(bypassModels, summarizerUrl, summarizerModel);
+        const compressedContent = await tokenmin.compress(rawContent, model);
+        
+        console.log(JSON.stringify({
+            hookSpecificOutput: {
+                hookEventName: 'BeforeModel',
+                llm_request: {
+                    contents: JSON.parse(compressedContent)
+                }
+            }
+        }));
+    } catch (err) {
+        console.error('[TokenMin] Compression failed:', err);
+        // On failure, don't modify the request
+        console.log(JSON.stringify({}));
     }
-    return tokenmin;
 }
 
-module.exports = {
-    name: 'TokenMin',
-    version: '1.0.0',
-    
-    // Register for the BeforeModel hook
-    hooks: {
-        async beforeModel(event) {
-            const { model, config, contents } = event;
-            const engine = initTokenMin(config);
-            
-            // Serialize contents to string
-            const rawContent = JSON.stringify(contents);
-            
-            try {
-                // Call WASM synchronously (it returns a promise)
-                const compressedContent = await engine.compress(rawContent, model);
-                return {
-                    modifiedContents: JSON.parse(compressedContent)
-                };
-            } catch (err) {
-                console.error('[TokenMin] Compression failed, bypassing:', err);
-                return { modifiedContents: contents }; // bypass
-            }
-        }
-    }
-};
+run();
 `;
     fs.writeFileSync(pluginPath, wrapperCode.trim());
-    console.log(`Plugin wrapper installed to: ${pluginPath}`);
+    console.log(`Hook wrapper installed to: ${pluginPath}`);
     
     // Step 4: Register with config
-    console.log('\n[4/4] Registering plugin in Gemini CLI config...');
+    console.log('\n[4/4] Registering hook in Gemini CLI settings.json...');
     try {
         const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         
-        if (!configData.plugins) {
-            configData.plugins = [];
+        if (!configData.hooks) {
+            configData.hooks = {};
+        }
+        if (!configData.hooks.BeforeModel) {
+            configData.hooks.BeforeModel = [];
         }
         
-        // Use relative path from config file to the plugin
-        const relativePluginPath = './' + path.relative(configDir, pluginPath).replace(/\\\\/g, '/');
+        const hookCommand = \`node "\${pluginPath.replace(/\\\\/g, '/')}"\`;
         
-        if (!configData.plugins.includes(relativePluginPath)) {
-            configData.plugins.push(relativePluginPath);
+        // Check if already registered
+        const alreadyRegistered = configData.hooks.BeforeModel.some(
+            entry => entry.hooks && entry.hooks.some(h => h.name === 'tokenmin-compress')
+        );
+        
+        if (!alreadyRegistered) {
+            configData.hooks.BeforeModel.push({
+                matcher: "*",
+                hooks: [
+                    {
+                        name: "tokenmin-compress",
+                        type: "command",
+                        command: hookCommand
+                    }
+                ]
+            });
             fs.writeFileSync(configPath, JSON.stringify(configData, null, 2));
-            console.log('Successfully registered TokenMin in gemini.config.json');
+            console.log('Successfully registered TokenMin in settings.json');
         } else {
             console.log('TokenMin is already registered in the configuration.');
         }
