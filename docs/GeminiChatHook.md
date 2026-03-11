@@ -41,10 +41,12 @@ You can write a Command Hook or a native CLI Extension that listens for the `Bef
 Because the `BeforeModel` hook has the power to arbitrarily rewrite the `contentsToUse` array, it introduces a potential vector for prompt injection or context tampering if a malicious local process gains control of the hook execution or the SQLite queue.
 * **The Mitigation (SQLite Mode):** This is why TokenMin uses **HMAC-SHA256 signatures** when operating in its default SQLite daemon mode. The `gemini-cli` hook signs each payload before dropping it into `/dev/shm`, and the daemon verifies this signature to detect and reject fabricated or modified context from processes that do **not** know the shared secret. This protection assumes that the HMAC key is stored securely and that filesystem permissions restrict access to the SQLite queue; it does **not** prevent a local process that already has the key (for example, running as the same user) from forging entries, nor does it prevent deletion of rows or other denial-of-service attacks against the queue.
 
-### Future Architecture: WebAssembly (WASM) / Direct Memory Piping
-While the `/dev/shm` SQLite queue provides excellent asynchronous decoupling across different languages (TypeScript CLI -> Rust Daemon), the overhead of serializing, signing (HMAC), writing to SQLite, reading, and deserializing may be unnecessary if TokenMin is loaded directly into the CLI's memory space.
+### Native Architecture: WebAssembly (WASM) / Direct Memory Piping
+While the `/dev/shm` SQLite queue provides excellent asynchronous decoupling across different languages (TypeScript CLI -> Rust Daemon), the overhead of serializing, signing (HMAC), writing to SQLite, reading, and deserializing is entirely bypassed when TokenMin is loaded directly into the CLI's memory space.
 
-As a future optimization specifically for native integrations like the `gemini-cli` hook, TokenMin could be compiled to **WebAssembly (WASM)**.
+**Only when in WASM mode does TokenMin operate in pure "memory mode" without SQLite.**
+
+As an optimization specifically for native integrations like the `gemini-cli` hook, TokenMin can be compiled to **WebAssembly (WASM)**.
 
 #### Why WASM over a TypeScript Bridge (`stdio`) or N-API / Neon?
 1. **The TypeScript Bridge (`child_process.spawn`):** While piping data over `stdio` to a standalone Rust binary avoids writing to disk (eliminating the need for HMAC signatures), it introduces significant process-spawning overhead. If a long-running daemon approach is used instead, the TypeScript hook must handle complex IPC (Inter-Process Communication) streaming and synchronization.
