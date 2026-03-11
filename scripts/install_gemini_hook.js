@@ -34,6 +34,14 @@ async function main() {
     // Step 2: Locate Gemini config
     console.log('\n[2/4] Locating Gemini CLI configuration...');
     
+    let isGeminiInstalled = false;
+    try {
+        execSync('which gemini', { stdio: 'ignore' });
+        isGeminiInstalled = true;
+    } catch (e) {
+        console.warn('⚠️  Warning: `gemini` command not found in PATH. Are you sure Gemini CLI is installed?');
+    }
+
     const possiblePaths = [
         path.join(process.env.HOME || process.env.USERPROFILE, '.gemini', 'gemini.config.json'),
         path.join(process.env.HOME || process.env.USERPROFILE, '.config', 'gemini', 'gemini.config.json'),
@@ -50,15 +58,27 @@ async function main() {
     
     if (!configPath) {
         console.log('Could not automatically locate gemini.config.json.');
-        const answer = await askQuestion('Please enter the full path to your gemini.config.json directory: ');
-        const testPath = path.join(answer.trim(), 'gemini.config.json');
-        if (fs.existsSync(testPath)) {
-            configPath = testPath;
-        } else if (fs.existsSync(answer.trim()) && answer.trim().endsWith('.json')) {
-            configPath = answer.trim();
+        console.log('We will create a new config file in ~/.gemini/gemini.config.json if you press Enter, or you can specify a custom path.');
+        const answer = await askQuestion('Path to config directory (Press Enter for ~/.gemini/): ');
+        
+        let targetDir;
+        if (!answer.trim()) {
+            targetDir = path.join(process.env.HOME || process.env.USERPROFILE, '.gemini');
         } else {
-            console.error('File still not found. Please create the config file first or provide the correct path.');
-            process.exit(1);
+            targetDir = answer.trim();
+            if (targetDir.endsWith('.json')) {
+                targetDir = path.dirname(targetDir);
+            }
+        }
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        
+        configPath = path.join(targetDir, 'gemini.config.json');
+        if (!fs.existsSync(configPath)) {
+            console.log(`Creating new config file at: ${configPath}`);
+            fs.writeFileSync(configPath, JSON.stringify({ plugins: [] }, null, 2));
         }
     }
     
