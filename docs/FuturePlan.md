@@ -20,7 +20,7 @@ This document outlines the potential architectural paths for integrating the Tok
 ### 1. Shared Memory SQLite Queue (Current Design)
 **Core Mechanism:** CLIs write/read prompts to a **dedicated TokenMin queue database** configured via `$TOKENMIN_DB` (default `/dev/shm/tokenmin/message_queue.sqlite3`). The TokenMin daemon watches and processes these queue records asynchronously.
 
-> Note: `$TOKENMIN_DB` is intended for TokenMin's own queue schema only. It should **not** be pointed at an existing CLI persistence database (such as `gemini-cli`’s default `chat_and_plan` SQLite DB) unless you explicitly add the required schema and integration logic (for example via a `BeforeModel` / pre-request hook). Treat the shared queue as an integration boundary, not a drop-in replacement for a CLI’s internal storage.
+> Note: `$TOKENMIN_DB` is intended for TokenMin's own queue schema only. It should **not** be pointed at an existing CLI persistence database unless you explicitly add the required schema and integration logic (for example via a `BeforeModel` / pre-request hook). Treat the shared queue as an integration boundary, not a drop-in replacement for a CLI’s internal storage.
 *   **Pros:**
     *   **Extremely High Performance:** Sub-millisecond reads/writes via RAM disk (`/dev/shm`).
     *   **Asynchronous:** TokenMin runs as a background daemon. Prompts queue and process independently.
@@ -82,7 +82,7 @@ This document outlines the potential architectural paths for integrating the Tok
 ## 🎯 Summary Recommendations
 
 1. **If sticking to the current Rust architecture (`/dev/shm` SQLite):**
-   Requires writing custom pre-execution hooks for `claude-cli` and `copilot-cli` so they know to drop their payloads into the database and wait for the HMAC-signed response before sending to the cloud. For `gemini-cli`, you can instead reuse its default `chat_and_plan` SQLite database (used for persisting conversations) as the shared queue path, rather than relying on any special tool integration.
+   Requires writing custom pre-execution hooks for `claude-cli` and `copilot-cli` so they know to drop their payloads into the database and wait for the HMAC-signed response before sending to the cloud. For `gemini-cli`, you can use its native `BeforeModel` hook to explicitly interface with TokenMin's queue.
 
 2. **For the easiest integration with all CLIs today (The Universal Path):**
    The **Local API Proxy** is historically the path of least resistance. By pointing all CLIs to `localhost:8080`, TokenMin handles the compression invisibly. However, this requires adding an HTTP server layer (like Axum or Warp) to the Rust codebase.
