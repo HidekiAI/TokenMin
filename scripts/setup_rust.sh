@@ -20,5 +20,12 @@ rustup install stable
 rustup update stable
 rustup default stable
 
+if ! command -v wasm-pack >/dev/null 2>&1; then
+  echo "[setup_rust.sh] Installing wasm-pack for WebAssembly support..."
+  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+else
+  echo "[setup_rust.sh] wasm-pack is already installed."
+fi
+
 LATEST=$(rustc --version)
 echo "[setup_rust.sh] Rust toolchain installed and set to stable: $LATEST."

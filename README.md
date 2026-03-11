@@ -38,6 +38,16 @@ TokenMin is designed to be a universal "trash compactor" for any CLI-based AI as
 
 For a full matrix of these options, pros, and cons, see [docs/FuturePlan.md](docs/FuturePlan.md).
 
+### First Target: `gemini-cli`
+Based on our architectural evaluation, our primary, initial integration target will be **[Gemini CLI](https://github.com/google/gemini-cli)**. 
+
+TokenMin can be compiled into a secure, zero-overhead WebAssembly (WASM) module and injected directly into the Gemini CLI via its `BeforeModel` hook.
+```bash
+# Automatically build the WASM and register the plugin wrapper with Gemini CLI
+node ./scripts/install_gemini_hook.js
+```
+For deep-dive documentation on this specific integration strategy, see [docs/GeminiChatHook.md](docs/GeminiChatHook.md).
+
 ## 📊 Performance Goals
 
 While efficiency varies based on the nature of the input, TokenMin aims to:

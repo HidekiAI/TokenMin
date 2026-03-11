@@ -26,3 +26,6 @@ target
 
 .gemini/
 gha-creds-*.json
+
+# WASM build output
+/pkg/

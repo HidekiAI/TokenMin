@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))]
 use rusqlite::types::{FromSql, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -42,6 +43,7 @@ impl FromStr for ProcessingStatus {
 }
 
 // Idiomatic and efficient SQLite integration
+#[cfg(not(target_arch = "wasm32"))]
 impl ToSql for ProcessingStatus {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         // Return static strings to avoid heap allocation
@@ -56,6 +58,7 @@ impl ToSql for ProcessingStatus {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl FromSql for ProcessingStatus {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let s = value.as_str()?;

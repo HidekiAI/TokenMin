@@ -1,6 +1,7 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -42,9 +43,13 @@ pub struct Summarizer {
 
 impl Summarizer {
     pub fn new(url: String, model: String) -> Result<Self, reqwest::Error> {
+        #[cfg(not(target_arch = "wasm32"))]
         let client = Client::builder()
             .timeout(Duration::from_secs(60)) // Summarization can take time
             .build()?;
+
+        #[cfg(target_arch = "wasm32")]
+        let client = Client::builder().build()?;
 
         // Normalize URL: trim trailing slash to avoid double-slash in endpoint construction
         let url = url.trim_end_matches('/').to_string();

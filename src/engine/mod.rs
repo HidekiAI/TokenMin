@@ -4,6 +4,7 @@ pub mod summarizer;
 use crate::models::{Message, ProcessingStatus};
 use std::collections::HashSet;
 
+#[derive(Clone)]
 pub struct Engine {
     pub bypass_models: HashSet<String>,
 }
