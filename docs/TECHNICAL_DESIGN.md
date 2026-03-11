@@ -6,6 +6,7 @@ TokenMin operates as a local "sidecar" service that intercepts and optimizes cha
 
 ### Components
 1.  **Client Application**: The user interface (CLI, Web, IDE plugin) that generates chat messages.
+    *   **Orchestrators & Frameworks (e.g., LangChain, AnythingLLM):** While `gemini-cli` is our reference implementation via native hooks, TokenMin is designed to be orchestrator-agnostic. Frameworks like LangChain or AnythingLLM that manage massive RAG (Retrieval-Augmented Generation) context windows can integrate with TokenMin by treating it as a "pre-computation step" or a "compression tool" within their chain before final LLM dispatch.
 2.  **Shared State (SQLite)**: A lightweight, file-based queue located in `/dev/shm` (Linux shared memory) for sub-millisecond latency. Acts as the IPC mechanism.
 3.  **TokenMin Watcher (Rust)**: A background daemon that polls the database for `pending` messages, processes them, and updates their state.
 ### 4. Local SLM (Ollama / Qwen 2.5)
