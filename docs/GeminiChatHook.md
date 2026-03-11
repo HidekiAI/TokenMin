@@ -53,7 +53,7 @@ As a future optimization specifically for native integrations like the `gemini-c
     * **How it hooks without code changes:** The `gemini-cli` supports loading external plugins/extensions via its configuration file (e.g., pointing `plugins: ["./my-tokenmin-plugin.js"]` in your local `gemini.config.json`). You would write a tiny, separate JavaScript plugin file that registers itself with the CLI's hook system. *Inside that external plugin file*, you would `import { compress } from 'tokenmin-wasm';` and return the compressed array. The core `gemini-cli` source code remains completely untouched.
     * **Universal Compatibility:** A single `.wasm` file runs on any OS and architecture where Node.js runs.
     * **Zero Latency:** No process spawning, no network overhead, and no IPC serialization.
-    * **Absolute Security:** The Rust code executes directly inside the exact same memory space as the `gemini-cli` Node.js process. The data never hits the OS, never hits a pipe, and never touches the disk, inherently mitigating all local tampering vectors without requiring HMAC signatures.
+    * **Reduced Local Exposure:** The Rust code executes directly inside the same process as the `gemini-cli` Node.js runtime, avoiding separate IPC channels like pipes, sockets, or SQLite queues. This reduces opportunities for tampering or leakage on those channels compared to a daemon or `stdio` bridge, but it does not protect against compromise of the `gemini-cli` process or host environment, and additional hardening (such as sandboxing or encryption) may still be required.
 
 ---
 
