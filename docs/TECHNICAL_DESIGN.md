@@ -8,7 +8,16 @@ TokenMin operates as a local "sidecar" service that intercepts and optimizes cha
 1.  **Client Application**: The user interface (CLI, Web, IDE plugin) that generates chat messages.
 2.  **Shared State (SQLite)**: A lightweight, file-based queue located in `/dev/shm` (Linux shared memory) for sub-millisecond latency. Acts as the IPC mechanism.
 3.  **TokenMin Watcher (Rust)**: A background daemon that polls the database for `pending` messages, processes them, and updates their state.
-4.  **Local SLM (Ollama)**: A locally running Small Language Model (e.g., Qwen 2.5-Coder) used for summarization.
+### 4. Local SLM (Ollama / Qwen 2.5)
+A locally running Small Language Model (e.g., Qwen 2.5-Coder via Ollama) is used for context distillation (summarization).
+
+#### Qwen 2.5 via Ollama vs. Google LiteRT
+A common architectural question for local inference is whether to use a heavyweight server like Ollama or an embedded runtime like **Google LiteRT** (formerly TensorFlow Lite), especially when integrating into Google tooling like `gemini-cli`. They solve fundamentally different problems:
+
+* **Ollama (Chosen Approach):** Ollama is a standalone API server that manages hardware acceleration (CUDA/Metal), model weights, and inference for massive transformer models (like the 0.5B to 7B parameter Qwen models). While it requires a separate background process, it allows TokenMin to perform high-quality, zero-shot summarization using state-of-the-art coding SLMs out of the box. The integration is a simple HTTP request.
+* **LiteRT:** LiteRT is an in-process, on-device inference runtime designed primarily for mobile devices and edge computing (IoT). It is optimized for running tiny, heavily quantized models directly within a binary without a background server. While embedding a model via LiteRT inside the TokenMin Rust binary (via `tflite-rs` bindings) or WASM module would eliminate the Ollama dependency, the current ecosystem of off-the-shelf, general-purpose summarization models available in `.tflite` format does not match the quality of GGUF/Ollama models. 
+
+If future embedded models (e.g., Gemma Nano) become available and easy to bundle via WebAssembly, migrating from Ollama to an embedded LiteRT execution model would represent the ultimate evolution of TokenMin's zero-dependency design.
 
 ### Data Flow
 1.  **Write**: Client inserts a new message into the SQLite `messages` table with status `pending`.
