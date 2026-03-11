@@ -22,7 +22,7 @@ if (beforeModelResult.modifiedContents) {
 ```
 
 ### Integration Strategy (Option 1 & Option 5)
-This hook is the exact choke-point needed for **Shared Memory SQLite (Option 1)** or **Native Plugins (Option 5)** from our `FuturePlan.md`. 
+This hook is the exact choke-point needed for the **Shared Memory SQLite (Option 1)** approach from our `FuturePlan.md`.
 
 You can write a Command Hook or a native CLI Extension that listens for the `BeforeModel` event:
 1. The CLI hands the hook the raw `contentsToUse` (the bloated chat history).
