@@ -60,6 +60,14 @@ case "$MODE" in
     echo "2.  lxc file push -r . tokenmin-tester/root/"
     echo "3.  lxc exec tokenmin-tester -- bash /root/scripts/setup.sh local"
     ;;
+  wasm)
+    echo "[setup.sh] Building TokenMin as a WASM module for Gemini CLI..."
+    if ! command -v node >/dev/null 2>&1; then
+      echo "[setup.sh] ERROR: Node.js is required to install the Gemini CLI hook."
+      exit 1
+    fi
+    node "$SCRIPT_DIR/install_gemini_hook.js"
+    ;;
   docker)
     echo "[setup.sh] Building Docker container for verification..."
     docker build -t tokenmin:latest .

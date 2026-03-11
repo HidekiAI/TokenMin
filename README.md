@@ -72,7 +72,7 @@ TokenMin is currently a work-in-progress. It requires **Ollama** and a **Rust 20
 
 ```bash
 # Set up all dependencies (Ollama, Rust, etc.)
-bash ./scripts/setup.sh [local|lxd|docker]
+bash ./scripts/setup.sh [local|wasm|lxd|docker]
 
 # Set your SQLite path (optimized for shared memory; this is the canonical default)
 export TOKENMIN_DB="/dev/shm/tokenmin/message_queue.sqlite3"
