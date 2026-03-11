@@ -67,6 +67,13 @@ case "$MODE" in
       exit 1
     fi
     node "$SCRIPT_DIR/install_gemini_hook.js"
+    echo ""
+    read -p "[setup.sh] Would you like to install, start Ollama, and pull the required model? [Y/n] " prompt_ollama || true
+    if [[ "$prompt_ollama" =~ ^[Nn]$ ]]; then
+      echo "[setup.sh] Skipping Ollama setup."
+    else
+      bash "$SCRIPT_DIR/setup_ollama.sh"
+    fi
     ;;
   docker)
     echo "[setup.sh] Building Docker container for verification..."
