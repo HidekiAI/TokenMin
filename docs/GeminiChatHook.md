@@ -78,3 +78,36 @@ Instead of using the Hook System, this approach involved hardcoding TokenMin dir
 This approach involved replacing or extending the `compress()` method in `ChatCompressionService`. When the CLI realized the context was getting too large, it would invoke the TokenMin Rust daemon via SQLite instead of its default local TypeScript token-pruning logic.
 
 **Why it was rejected:** While semantically the "correct" place for compression logic, extending this internal class currently requires modifying the source code and maintaining a fork, whereas the `BeforeModel` hook provides the same prompt-interception capability via officially supported extensions.
+
+---
+
+## 🛠️ Troubleshooting & Verification
+
+If you are using the WASM hook integration and want to verify that TokenMin is successfully intercepting your Gemini CLI prompts, you can perform the following tests:
+
+### 1. Manual Payload Test
+The TokenMin command hook wrapper reads a JSON payload from `stdin`. You can manually pipe a mock payload into the script to verify it is returning the compressed output correctly:
+
+```bash
+echo '{"llm_request":{"contents":"Test", "model":"gemini-3.1-pro-preview-customtools"}}' | node ~/.gemini/tokenmin/tokenmin-hook.js
+```
+
+**Expected Output:**
+```json
+{"hookSpecificOutput":{"hookEventName":"BeforeModel","llm_request":{"contents":"Test"}}}
+```
+
+### 2. Live Debugging in Gemini CLI
+You can launch the Gemini CLI in debug mode and send a headless prompt to verify the hook executes during an actual session:
+
+```bash
+gemini -d -p "Test prompt"
+```
+
+Look for the following lines in the debug output (usually near the end):
+```text
+Created execution plan for BeforeModel: 1 hook(s) to execute in parallel
+Expanding hook command: node "/home/user/.gemini/tokenmin/tokenmin-hook.js" ...
+Hook execution for BeforeModel: 1 hooks executed successfully, total duration: 66ms
+```
+If it says **"1 hooks executed successfully"**, TokenMin is actively filtering and compressing your context natively!

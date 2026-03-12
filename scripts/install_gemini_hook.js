@@ -114,8 +114,26 @@ const summarizerModel = process.env.TOKENMIN_SUMMARIZER_MODEL || 'qwen2.5-coder'
 
 const tokenmin = new TokenMinWasm(bypassModels, summarizerUrl, summarizerModel);
 
-// Hook input is provided as a JSON string via process.argv[2]
-const input = JSON.parse(process.argv[2]);
+// Hook input is provided as a JSON string via process.env.GEMINI_CLI_HOOK_INPUT
+const fs = require('fs');
+
+// Gemini CLI passes the JSON payload via stdin
+let rawInput = '';
+try {
+    rawInput = fs.readFileSync(0, 'utf-8');
+} catch (e) {
+    // ignore
+}
+
+if (!rawInput) {
+    rawInput = process.env.GEMINI_CLI_HOOK_INPUT || process.env.CLAUDE_CODE_HOOK_INPUT || process.argv[2];
+}
+
+if (!rawInput) {
+    console.error('[TokenMin] No input provided to hook.');
+    process.exit(1);
+}
+const input = JSON.parse(rawInput);
 
 async function run() {
     try {
