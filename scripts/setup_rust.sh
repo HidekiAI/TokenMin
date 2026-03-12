@@ -22,7 +22,9 @@ rustup default stable
 
 if ! command -v wasm-pack >/dev/null 2>&1; then
   echo "[setup_rust.sh] Installing wasm-pack for WebAssembly support..."
-  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+  WASM_PACK_INSTALLER="/tmp/wasm-pack-init.sh"
+  curl --proto '=https' --tlsv1.2 -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh -o "$WASM_PACK_INSTALLER"
+  sh "$WASM_PACK_INSTALLER"
 else
   echo "[setup_rust.sh] wasm-pack is already installed."
 fi
