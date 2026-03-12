@@ -88,3 +88,28 @@ cargo run --release
 ```
 
 - `setup.sh` will call all required setup scripts (Ollama, Rust, etc.) to get the workspace ready for development and testing.
+
+
+---
+
+## 🛑 Project Status: Deprecated & Abandoned
+
+After evaluating the practical utility of prompt compression in 2026, **TokenMin** is being moved to an archived state. While the project successfully reduces token counts, the trade-off between **context density** and **semantic precision** has rendered this approach "moot" for professional workflows.
+
+### Why this project is no longer viable:
+
+#### 1. Precision vs. Compression (The Developer's Dilemma)
+* **Syntactic Fragility:** Code is high-entropy data. Even minor "optimizations" can strip critical semicolons, break indentation, or mangle variable names. For programmers, losing structural integrity makes the model’s output technically useless.
+* **Contextual Dilution:** Modern LLMs require full architectural context to debug effectively. Compression generalizes the input, which is the opposite of the precision required for software engineering.
+
+#### 2. The "Proofreading" Paradox (The Author's Dilemma)
+* **Loss of Error Context:** To correct grammar or style, an LLM must see the *original* flawed text. Compressing text removes the very "inefficiencies" the author is trying to fix.
+* **Voice Distortion:** Compression acts as a lossy filter. For creative writing, this results in the LLM "hallucinating" stylistic filler to bridge the gaps created by the algorithm.
+
+#### 3. Shift in Model Economics
+* **The Output Bottleneck:** Token costs and latencies are now primarily driven by **output tokens**. Reducing input tokens via compression provides negligible ROI compared to the risk of degrading the model's reasoning quality.
+* **Infinite Context:** With 2026 models offering native context windows of 1M+ tokens, the "need to squeeze" has been replaced by **RAG (Retrieval-Augmented Generation)** and **MCP (Model Context Protocol)**, which retrieve exact, unaltered data chunks rather than compressing them.
+
+### Conclusion
+In a world of massive context windows and high-precision requirements, **lossy prompt compression is a solution looking for a problem.** 
+---
