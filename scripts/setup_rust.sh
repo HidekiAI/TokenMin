@@ -23,8 +23,23 @@ rustup default stable
 if ! command -v wasm-pack >/dev/null 2>&1; then
   echo "[setup_rust.sh] Installing wasm-pack for WebAssembly support..."
   WASM_PACK_INSTALLER="/tmp/wasm-pack-init.sh"
-  curl --proto '=https' --tlsv1.2 -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh -o "$WASM_PACK_INSTALLER"
-  sh "$WASM_PACK_INSTALLER"
+  echo "[SECURITY] This will download and execute the official wasm-pack installer script from:"
+  echo "[SECURITY]   https://rustwasm.github.io/wasm-pack/installer/init.sh"
+  echo "[SECURITY] You can review the installer before proceeding, for example:"
+  echo "[SECURITY]   curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh -o wasm-pack-init.sh"
+  echo "[SECURITY]   less wasm-pack-init.sh"
+  read -r -p "[setup_rust.sh] Proceed with downloading and running the wasm-pack installer? [y/N]: " WASM_PACK_CONFIRM
+  case "${WASM_PACK_CONFIRM:-}" in
+    [yY])
+      curl --proto '=https' --tlsv1.2 -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh -o "$WASM_PACK_INSTALLER"
+      sh "$WASM_PACK_INSTALLER"
+      ;;
+    *)
+      echo "[setup_rust.sh] Skipping automatic wasm-pack installation at user request."
+      echo "[setup_rust.sh] To install manually, review and run the official installer script from:"
+      echo "[setup_rust.sh]   https://rustwasm.github.io/wasm-pack/installer/init.sh"
+      ;;
+  esac
 else
   echo "[setup_rust.sh] wasm-pack is already installed."
 fi
