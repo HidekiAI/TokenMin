@@ -156,7 +156,7 @@ run();
             configData.hooks.BeforeModel = [];
         }
         
-        const hookCommand = \`node "\${pluginPath.replace(/\\\\/g, '/')}"\`;
+        const hookCommand = `node "${pluginPath.replace(/\\\\/g, '/')}"`;
         
         // Check if already registered
         const alreadyRegistered = configData.hooks.BeforeModel.some(
