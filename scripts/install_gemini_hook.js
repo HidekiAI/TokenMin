@@ -199,9 +199,18 @@ run();
         }
         
     } catch (e) {
-        console.error('Failed to parse or update gemini.config.json:', e);
-        console.log('Please manually add the plugin to your config:');
-        console.log(`  "plugins": ["${pluginPath}"]`);
+        console.error('Failed to parse or update settings.json:', e);
+        console.log('Please manually add the TokenMin hook to your Gemini CLI settings.json. Under "hooks.BeforeModel", add an entry like:');
+        console.log(`  {`);
+        console.log(`    "matcher": "*",`);
+        console.log(`    "hooks": [`);
+        console.log(`      {`);
+        console.log(`        "name": "tokenmin-compress",`);
+        console.log(`        "type": "command",`);
+        console.log(`        "command": "node \\"${pluginPath.replace(/\\\\/g, '/')}\\\""`);
+        console.log(`      }`);
+        console.log(`    ]`);
+        console.log(`  }`);
     }
     
     console.log('\n✨ TokenMin WASM installation complete!');
