@@ -42,6 +42,15 @@ async function main() {
         console.warn('⚠️  Warning: `gemini` command not found in PATH. Are you sure Gemini CLI is installed?');
     }
 
+    if (!isGeminiInstalled) {
+        const proceedAnswer = await askQuestion('`gemini` was not found in your PATH. Continue installing the hook anyway? (y/N): ');
+        const normalized = proceedAnswer.trim().toLowerCase();
+        if (normalized !== 'y' && normalized !== 'yes') {
+            console.log('Aborting installation because `gemini` is not installed or not in PATH.');
+            rl.close();
+            process.exit(1);
+        }
+    }
     const possiblePaths = [
         path.join(process.env.HOME || process.env.USERPROFILE, '.gemini', 'settings.json'),
         path.join(process.cwd(), '.gemini', 'settings.json') // Fallback to workspace settings
