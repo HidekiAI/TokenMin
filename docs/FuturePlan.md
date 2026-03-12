@@ -79,6 +79,16 @@ This document outlines the potential architectural paths for integrating the Tok
 
 ---
 
+## ✨ Planned Enhancements
+
+### 1. Minimum Threshold Bypass
+To avoid unnecessary overhead for very short, simple prompts, TokenMin will introduce a minimum byte/token threshold. If an incoming prompt's length is less than a configurable threshold (e.g., `TOKENMIN_MIN_BYTES=512`), the engine will bypass compression entirely and relay the payload directly to the LLM.
+
+### 2. Intelligent File Evaluation
+When users attach files to their prompts (e.g., via CLI context inclusion or tools), TokenMin will evaluate the content or file extension. If the attached content is recognized as source code, it will automatically be wrapped and treated as a `code_block`. This ensures it enters the Code Sanctuary, bypassing the summarization model and preserving its exact structure.
+
+---
+
 ## 🎯 Summary Recommendations
 
 1. **If sticking to the current Rust architecture (`/dev/shm` SQLite):**
