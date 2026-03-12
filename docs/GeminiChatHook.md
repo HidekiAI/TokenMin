@@ -41,16 +41,18 @@ You can write a Command Hook or a native CLI Extension that listens for the `Bef
 Because the `BeforeModel` hook has the power to arbitrarily rewrite the `contentsToUse` array, it introduces a potential vector for prompt injection or context tampering if a malicious local process gains control of the hook execution or the SQLite queue.
 * **The Mitigation (SQLite Mode):** This is why TokenMin uses **HMAC-SHA256 signatures** when operating in its default SQLite daemon mode. The `gemini-cli` hook signs each payload before dropping it into `/dev/shm`, and the daemon verifies this signature to detect and reject fabricated or modified context from processes that do **not** know the shared secret. This protection assumes that the HMAC key is stored securely and that filesystem permissions restrict access to the SQLite queue; it does **not** prevent a local process that already has the key (for example, running as the same user) from forging entries, nor does it prevent deletion of rows or other denial-of-service attacks against the queue.
 
-### Future Architecture: WebAssembly (WASM) / Direct Memory Piping
-While the `/dev/shm` SQLite queue provides excellent asynchronous decoupling across different languages (TypeScript CLI -> Rust Daemon), the overhead of serializing, signing (HMAC), writing to SQLite, reading, and deserializing may be unnecessary if TokenMin is loaded directly into the CLI's memory space.
+### Native Architecture: WebAssembly (WASM) / Direct Memory Piping
+While the `/dev/shm` SQLite queue provides excellent asynchronous decoupling across different languages (TypeScript CLI -> Rust Daemon), the overhead of serializing, signing (HMAC), writing to SQLite, reading, and deserializing is entirely bypassed when TokenMin is loaded directly into the CLI's memory space.
 
-As a future optimization specifically for native integrations like the `gemini-cli` hook, TokenMin could be compiled to **WebAssembly (WASM)**.
+**Only when in WASM mode does TokenMin operate in pure "memory mode" without SQLite.**
+
+As an optimization specifically for native integrations like the `gemini-cli` hook, TokenMin can be compiled to **WebAssembly (WASM)**.
 
 #### Why WASM over a TypeScript Bridge (`stdio`) or N-API / Neon?
 1. **The TypeScript Bridge (`child_process.spawn`):** While piping data over `stdio` to a standalone Rust binary avoids writing to disk (eliminating the need for HMAC signatures), it introduces significant process-spawning overhead. If a long-running daemon approach is used instead, the TypeScript hook must handle complex IPC (Inter-Process Communication) streaming and synchronization.
 2. **N-API / Neon (Node.js Addons):** These allow compiling Rust directly into a Node.js binary module. While extremely fast, they require compiling native binaries for every possible target architecture (Mac, Linux, Windows, x64, ARM) that the user might run `gemini-cli` on, creating a distribution nightmare.
 3. **WebAssembly (WASM):** This is the holy grail. Rust compiles seamlessly to WASM via tools like `wasm-pack`. 
-    * **How it hooks without code changes:** The `gemini-cli` supports loading external plugins/extensions via its configuration file (e.g., pointing `plugins: ["./my-tokenmin-plugin.js"]` in your local `gemini.config.json`). You would write a tiny, separate JavaScript plugin file that registers itself with the CLI's hook system. *Inside that external plugin file*, you would `import { compress } from 'tokenmin-wasm';` and return the compressed array. The core `gemini-cli` source code remains completely untouched.
+    * **How it hooks without code changes:** The `gemini-cli` supports custom command hooks configured in your local `~/.gemini/settings.json`. You would write a tiny, separate Node.js script that acts as the command hook. *Inside that external script*, you would `import { compress } from 'tokenmin-wasm';` and return the compressed array to stdout. The core `gemini-cli` source code remains completely untouched.
     * **Universal Compatibility:** A single `.wasm` file runs on any OS and architecture where Node.js runs.
     * **Zero Latency:** No process spawning, no network overhead, and no IPC serialization.
     * **Reduced Local Exposure:** The Rust code executes directly inside the same process as the `gemini-cli` Node.js runtime, avoiding separate IPC channels like pipes, sockets, or SQLite queues. This reduces opportunities for tampering or leakage on those channels compared to a daemon or `stdio` bridge, but it does not protect against compromise of the `gemini-cli` process or host environment, and additional hardening (such as sandboxing or encryption) may still be required.
@@ -76,3 +78,36 @@ Instead of using the Hook System, this approach involved hardcoding TokenMin dir
 This approach involved replacing or extending the `compress()` method in `ChatCompressionService`. When the CLI realized the context was getting too large, it would invoke the TokenMin Rust daemon via SQLite instead of its default local TypeScript token-pruning logic.
 
 **Why it was rejected:** While semantically the "correct" place for compression logic, extending this internal class currently requires modifying the source code and maintaining a fork, whereas the `BeforeModel` hook provides the same prompt-interception capability via officially supported extensions.
+
+---
+
+## 🛠️ Troubleshooting & Verification
+
+If you are using the WASM hook integration and want to verify that TokenMin is successfully intercepting your Gemini CLI prompts, you can perform the following tests:
+
+### 1. Manual Payload Test
+The TokenMin command hook wrapper reads a JSON payload from `stdin`. You can manually pipe a mock payload into the script to verify it is returning the compressed output correctly:
+
+```bash
+echo '{"llm_request":{"contents":"Test", "model":"gemini-3.1-pro-preview-customtools"}}' | node ~/.gemini/tokenmin/tokenmin-hook.js
+```
+
+**Expected Output:**
+```json
+{"hookSpecificOutput":{"hookEventName":"BeforeModel","llm_request":{"contents":"Test"}}}
+```
+
+### 2. Live Debugging in Gemini CLI
+You can launch the Gemini CLI in debug mode and send a headless prompt to verify the hook executes during an actual session:
+
+```bash
+gemini -d -p "Test prompt"
+```
+
+Look for the following lines in the debug output (usually near the end):
+```text
+Created execution plan for BeforeModel: 1 hook(s) to execute in parallel
+Expanding hook command: node "/home/user/.gemini/tokenmin/tokenmin-hook.js" ...
+Hook execution for BeforeModel: 1 hooks executed successfully, total duration: 66ms
+```
+If it says **"1 hooks executed successfully"**, TokenMin is actively filtering and compressing your context natively!

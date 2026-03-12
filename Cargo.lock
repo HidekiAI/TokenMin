@@ -1571,6 +1571,7 @@ dependencies = [
  "dotenv",
  "hex",
  "hmac",
+ "js-sys",
  "mockito",
  "once_cell",
  "regex",
@@ -1581,6 +1582,8 @@ dependencies = [
  "sha2",
  "tokio",
  "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
