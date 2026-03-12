@@ -148,14 +148,25 @@ async function run() {
     try {
         const rawContent = JSON.stringify(input.llm_request.contents);
         const model = input.llm_request.model;
-        
+
         const compressedContent = await tokenmin.compress(rawContent, model);
-        
+
+        let newContents = input.llm_request.contents;
+        try {
+            const parsed = JSON.parse(compressedContent);
+            if (Array.isArray(parsed)) {
+                newContents = parsed;
+            }
+        } catch (parseErr) {
+            // If the compressed output is not valid JSON, fall back to original contents
+            newContents = input.llm_request.contents;
+        }
+
         console.log(JSON.stringify({
             hookSpecificOutput: {
                 hookEventName: 'BeforeModel',
                 llm_request: {
-                    contents: JSON.parse(compressedContent)
+                    contents: newContents
                 }
             }
         }));
